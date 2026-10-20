@@ -145,7 +145,7 @@ def process_image(image_path, output_csv, current_time, mongo_key):
     dimensionalRecognition = numpy.array(faceChannelDim.predict(face, preprocess=False))
     # Read the generated CSV file
 
-    
+    """
     csv_name = os.path.basename(image_path)
     csv_name = csv_name[:-4]
     output_file = os.path.join(output_dir, f"{csv_name}.csv")
@@ -158,7 +158,7 @@ def process_image(image_path, output_csv, current_time, mongo_key):
         df['valence'] = dimensionalRecognition[1][0][0]
         df['filename'] = os.path.basename(image_path)
         df['timeStamp'] = time.ctime(int(current_time))
-    
+        """
     data_to_send.append(float(dimensionalRecognition[1][0][0]))
     data_to_send.append(float(dimensionalRecognition[0][0][0]))
 

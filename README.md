@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
     <a href="https://www.cam.ac.uk/">
         <img src="https://www.cam.ac.uk/sites/www.cam.ac.uk/files/inner-images/logo.jpg" width="128px" />
     </a>
@@ -10,43 +10,48 @@
 
 This platform is designed to facilitate advanced research in the field of user-bot interactions and LLMS models. It offers a comprehensive environment for conducting, monitoring, and analyzing experiments in this cutting-edge domain.
 
-## 🚀 Quick Start
+## 🏛️ About this version (BGU lab)
 
-To set up and start using the project, follow these steps:
+This is the Ben-Gurion University lab's version of Lexi, forked from [veb7vmehra/Lexi2.0](https://github.com/veb7vmehra/Lexi2.0). It is published for students to download, run and experiment with. The lab's production deployment is maintained separately.
+
+Main additions over the original:
+
+- **Group conversations**: several agents and one participant, with turn-taking, humanized typing and pacing, and token streaming.
+- **Conversation phases**: agent behaviour that changes over a conversation, by turns or by time.
+- **Survey-embedded conversations**: one conversation split into blocks between survey pages (e.g. Qualtrics), with survey answers passed to the agents.
+- **More model providers**: OpenAI, Anthropic, Google, xAI and OpenRouter.
+- **Per-researcher API keys**: each researcher adds their own keys in the admin UI, stored encrypted.
+- **Accounts**: researcher accounts, password changes and admin password reset.
+
+## 🚀 Quick Start
 
 ### Step 0: Download the following pre-requirements:
 
-Node.JS - <a href="https://nodejs.org/en">https://nodejs.org/en</a><br>
-Npm - <a href="https://docs.npmjs.com/downloading-and-installing-node-js-and-npm">https://docs.npmjs.com/downloading-and-installing-node-js-and-npm</a><br>
+Node.js 22 - <a href="https://nodejs.org/en">https://nodejs.org/en</a> (Lexi is pinned to Node 22; npm comes with it)<br>
 Git - <a href ="https://git-scm.com/downloads">https://git-scm.com/downloads</a><br>
-Python 3 - <a href ="https://www.python.org/downloads/">https://www.python.org/downloads/<br>
-OpenAI api key - <a href ="https://help.openai.com/en/articles/4936850-where-do-i-find-my-api-key">OpenAI api key info</a>
+Python 3 - <a href ="https://www.python.org/downloads/">https://www.python.org/downloads/</a> (only for the facial action-unit extraction)<br>
+An API key for at least one model provider (OpenAI, Anthropic, Google, xAI or OpenRouter)
 
 ### Step 1: Set Up MongoDB Database
 
 Before setting up the project, you'll need a MongoDB database. You can set this up locally on your machine, or use MongoDB Atlas for a cloud-based solution.
 
 - **Setting up MongoDB Locally:**
-  Follow [this guide](https://docs.mongodb.com/manual/installation/) to install MongoDB locally on your system.
+  Follow [this guide](https://docs.mongodb.com/manual/installation/) to install MongoDB locally on your system. Your connection string will look like `mongodb://localhost:27017/lexi`.
 
 - **Setting up MongoDB on Atlas:**
-  MongoDB Atlas offers a cloud-based solution. You can set up a free cluster following [this guide](https://docs.atlas.mongodb.com/getting-started/).
+  MongoDB Atlas offers a cloud-based solution. You can set up a free cluster following [this guide](https://docs.atlas.mongodb.com/getting-started/). Atlas shows your connection string under **Connect → Drivers**: put your database user's password in place of `<db_password>`, and add a database name (e.g. `lexi`) right after `.mongodb.net/`.
 
   **Make sure you are adding your ip to be white listed**
 
 ### Step 2: Clone the Repository
 
 ```bash
-git clone https://github.com/veb7vmehra/Lexi2.0.git
+git clone https://github.com/labbgulab-lab/Lexi2.0.git
+cd Lexi2.0
 ```
 
 ### Step 3: Install Dependencies
-
-- For the client:
-  ```bash
-  cd client
-  npm run setup
-  ```
 
 - For the server:
   ```bash
@@ -54,94 +59,78 @@ git clone https://github.com/veb7vmehra/Lexi2.0.git
   npm run setup
   ```
 
+- For the client:
+  ```bash
+  cd client
+  npm run setup
+  ```
+
 ### Setup Process Details
 
-During the setup process, you'll be guided through a series of prompts to configure your environment:
+The server setup asks for one thing: your **full MongoDB connection string**, including the user, password and database name (see Step 1). It then:
 
-- `OPENAI_API_KEY`: Enter your OpenAI API key.
-- `MONGODB_USER`: Enter the MongoDB username.
-- `MONGODB_PASSWORD`: Enter the password for MongoDB.
-- `MONGODB_URL`: Provide the MongoDB URL (mongodb+srv://<cluster-name>.mongodb.net).
-- `MONGODB_DB_NAME`: Choose a name for your MongoDB database.
+- **Creates `server/.env`** with the connection string and freshly generated secrets: `JWT_SECRET_KEY` (signs logins) and `API_KEY_ENCRYPTION_KEY` (encrypts the API keys stored in the database). Keep this file; if you lose `API_KEY_ENCRYPTION_KEY`, the stored API keys can no longer be read and must be added again.
+- **Installs dependencies and builds** the server.
+- **Creates an admin user** with the username and password you choose.
 
-Additionally, the setup script will guide you in creating an administrative user for your system. You'll need to provide a username and password for this user.
+The client setup creates `client/.env` pointing the client at `http://localhost:5000` and installs its dependencies.
 
-### Functions of the Setup Script
+### Step 4: Add an API key
 
-The setup script automates several important tasks to get your server up and running:
+Start the project (Step 7), log in with the admin user, and open **Settings → API Keys → Add API Key**. Agents can only use models from providers you have a key for.
 
-- **Configures Environment Variables**: 
-  - It creates a `.env` file containing essential environment variables like your OpenAI API key, MongoDB credentials, and other necessary configurations.
-- **Installs Dependencies**: 
-  - Executes `npm install` to install all the necessary npm packages that the server requires to function properly.
-- **Builds the Project**: 
-  - Runs the build process for your TypeScript code, compiling it and preparing your server for execution.
-- **Initializes Admin User**: 
-  - Creates an admin user within your system using the credentials you provide, facilitating immediate access to admin-level features.
+### Step 5: Setting up openFace
 
-This comprehensive setup ensures that all necessary components are correctly configured, laying the foundation for a smooth and efficient operation of the server.
+The current [openFace](https://github.com/TadasBaltrusaitis/OpenFace) version downloaded with this github contains windows exe files, for linux and macOS, you can follow the following steps:
 
-### Step 4: Install pip requirements
+- [Installastion steps for Unix](https://github.com/TadasBaltrusaitis/OpenFace/wiki/Unix-Installation)
+- [Installation steps for MacOS](https://github.com/TadasBaltrusaitis/OpenFace/wiki/Mac-installation)
+- Make sure to install openFace inside the Lexi2.0 folder and rename the openface folder to "openFace".
+
+If you haven't until now, irrespective of your OS, run the download_models.ps1 (for Windows) or download_models.sh (for Unix and MacOS), you can find these scripts inside the openFace folder.
+
+### Step 6: Install pip requirements
 
 Run the following command inside the Lexi2.0 folder from terminal.
 ```bash
 pip install -r requirements.txt
 ```
 
-Further make sure to install FaceChannel with:
-```bash
-pip install FaceChannel
-```
-In addition, add the h5 files from the models folder of this repository into the:
-```bash
-C:\Users\<USERNAME>\.conda\envs\lexi\lib\site-packages\FaceChannel\FaceChannelV1\TrainedNetworks
-```
-Or similar folder of your python environment.
+### Step 7: Running the Project
 
-### Step 5: Running the Project
+- For the Server:
+    ```bash
+    cd server
+    npm run dev
+    ```
+**server will run on: http://localhost:5000**
 
 - For the Client:
     ```bash
     cd client
     npm start
     ```
-
 **client will run on: http://localhost:3000**
-
-- For the Server:
-    ```bash
-    cd server
-    npm run dev
-    ``` 
-**server will run on: http://localhost:5000**
 
 - For action unit extaction:
   ```bash
   python AU_extractor.py
   ```
 
-Encountering difficulties with your local environment setup? Consult our [Troubleshooting Guide](TROUBLESHOOTING.md) for assistance in resolving your issues.
+Encountering difficulties with your local environment setup? Consult the [Troubleshooting Guide](TROUBLESHOOTING..md). Conversation phases are documented in [PHASES.md](PHASES.md).
 
 ## 🌐 Deployment
 
 Intersted to deploy Lexi? Please read our [Deployment Guide](DEPLOYMENT.md) for information on how to deploy.
 
-## 🛠️ Contributing
-
-Interested in contributing? We value your input and contributions! Please read our [Contributing Guidelines](CONTRIBUTION.md) for information on how to get started.
-
 ## 🔗 Useful Links
 
 - [Project Homepage](https://www.lexi.network/project-overview)
-- [Research Paper](#) (Link to related research papers or articles)
+- [The original Lexi 2.0](https://github.com/veb7vmehra/Lexi2.0)
 
 ## 📄 License
 
-This project is licensed under the [CC BY-NC 4.0 License](LICENSE.md).
-
-## 📞 Contact
-
-For any inquiries or further information, reach out to us at [veb7vmehra@gmail.com](mailto:veb7vmehra@gmail.com).
+This project is licensed under the [CC BY-NC 4.0 License](license): you may share and adapt it for non-commercial purposes, with credit to the original authors.
 
 ## 👍 Show Your Support
 

@@ -1,4 +1,6 @@
+import { extractError } from '@DAL/extractError';
 import { deleteExperiment, getExperiments, updateExperimentsStatus } from '@DAL/server-requests/experiments';
+import { useAppSelector } from '@DAL/redux/store';
 import { WarningMessage } from '@components/common/WarningMessasge';
 import { SnackbarStatus, useSnackbar } from '@contexts/SnackbarProvider';
 import useEffectAsync from '@hooks/useEffectAsync';
@@ -9,10 +11,15 @@ import { Box, Dialog, Typography } from '@mui/material';
 import { useState } from 'react';
 import ExperimentForm from '../ExperimentForm';
 import ExperimentsList from '../experiments-list/ExperimentsList';
+import { ListSearchControl, ListSortControl, SortMode } from '../../shared/listSortGroup';
 import { AddButton, IconButtonStyled, MainContainerStyled } from './Experiments.s';
 
 export const Experiments = ({ agents, forms }) => {
     const { openSnackbar } = useSnackbar();
+    const activeUser = useAppSelector((state) => state.activeUser);
+    const showUsers = activeUser?.role === 'admin';
+    const [sortMode, setSortMode] = useState<SortMode>('newest');
+    const [search, setSearch] = useState('');
     const [experiments, setExperiments] = useState<ExperimentType[]>([]);
     const [isEditMode, setIsEditMode] = useState(false);
     const [isLoadingStatusChange, setIsLoadingStatusChange] = useState(false);
@@ -31,7 +38,8 @@ export const Experiments = ({ agents, forms }) => {
             setExperiments(res);
             setTempExperiments(res);
         } catch (error) {
-            openSnackbar('Failed to load experiments', SnackbarStatus.ERROR);
+            const { message } = extractError(error, 'Failed to load experiments');
+            openSnackbar(message, SnackbarStatus.ERROR);
             setExperiments([]);
             setTempExperiments([]);
         }
@@ -67,8 +75,9 @@ export const Experiments = ({ agents, forms }) => {
             await updateExperimentsStatus(updatedExperiments);
             setExperiments(tempExperiments);
             setModifiedExperiments({});
-        } catch {
-            openSnackbar('Failed to update experiments status', SnackbarStatus.ERROR);
+        } catch (error) {
+            const { message } = extractError(error, 'Failed to update experiments status');
+            openSnackbar(message, SnackbarStatus.ERROR);
             setTempExperiments(experiments);
             setModifiedExperiments({});
         }
@@ -89,7 +98,8 @@ export const Experiments = ({ agents, forms }) => {
             setExperiments(experiments.filter((exp) => exp._id !== editExperiment._id));
             openSnackbar('Delete Experiment Success !', SnackbarStatus.SUCCESS);
         } catch (err) {
-            openSnackbar('Failed to Delete Experiment', SnackbarStatus.ERROR);
+            const { message } = extractError(err, 'Failed to Delete Experiment');
+            openSnackbar(message, SnackbarStatus.ERROR);
         } finally {
             setIsLoadingDelete(false);
             setOpenDeleteExpDialog(false);
@@ -110,7 +120,13 @@ export const Experiments = ({ agents, forms }) => {
                     Manage your experiments, attcach to them a agent, launch them, share with participants and
                     more.
                 </Typography>
-                <Box display={'flex'} justifyContent={'end'}>
+                <Box display={'flex'} justifyContent={'end'} alignItems={'center'} gap={2}>
+                    <ListSearchControl
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search experiments by name…"
+                    />
+                    <ListSortControl value={sortMode} onChange={setSortMode} showUsers={showUsers} />
                     <AddButton onClick={() => setOpenExperimentFormDialog(true)} size="small">
                         <AddIcon style={{ color: 'floralwhite' }} />
                         <Typography variant="body2" fontWeight={500} color={'floralwhite'}>
@@ -121,6 +137,8 @@ export const Experiments = ({ agents, forms }) => {
             </Box>
             <ExperimentsList
                 experiments={tempExperiments}
+                sortMode={sortMode}
+                search={search}
                 modifiedExperiments={modifiedExperiments}
                 handleStatusChange={handleStatusChange}
                 handleSaveChanges={handleSaveChanges}

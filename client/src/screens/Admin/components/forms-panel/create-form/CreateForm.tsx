@@ -4,6 +4,7 @@ import { Box, Button, Typography } from '@mui/material';
 import { useCallback, useState } from 'react';
 import { FormProvider, useFieldArray, useForm } from 'react-hook-form';
 import { defaultForm, defaultQuestionProps } from '../../../../../DAL/constants';
+import { extractError } from '../../../../../DAL/extractError';
 import { getForm, saveForm, updateForm } from '../../../../../DAL/server-requests/forms';
 import Question, { BinaryRadioSelectorProps } from '../../../../../components/questions/Question';
 import { SnackbarStatus, useSnackbar } from '../../../../../contexts/SnackbarProvider';
@@ -42,7 +43,8 @@ export const CreateForm = ({ editFormId, setEditFormId, setForms }) => {
                 setForm(defaultForm);
             }
         } catch (error) {
-            openSnackbar('Failed to load form', SnackbarStatus.ERROR);
+            const { message } = extractError(error, 'Failed to load form');
+            openSnackbar(message, SnackbarStatus.ERROR);
         }
     }, [editFormId]);
 
@@ -116,7 +118,8 @@ export const CreateForm = ({ editFormId, setEditFormId, setForms }) => {
             setEditFormId(formRes._id);
             openSnackbar('Form Saved !', SnackbarStatus.SUCCESS);
         } catch (error) {
-            openSnackbar('Form Saving Failed', SnackbarStatus.ERROR);
+            const { message } = extractError(error, 'Form Saving Failed');
+            openSnackbar(message, SnackbarStatus.ERROR);
         }
     };
 
@@ -126,7 +129,7 @@ export const CreateForm = ({ editFormId, setEditFormId, setForms }) => {
 
     const addQuestion = useCallback(async () => {
         if (questionLength >= 15) {
-            openSnackbar(`Form Qustions Limit Exceeded: ${questionLength}`, SnackbarStatus.WARNING);
+            openSnackbar(`Form Questions Limit Exceeded: ${questionLength}`, SnackbarStatus.WARNING);
             return;
         }
 

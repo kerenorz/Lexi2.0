@@ -58,4 +58,9 @@ const theme = createTheme({
     },
 });
 
+// Group-chat per-speaker bubble colors. Index 0 is the existing assistant color
+// (#CADEEA); index 1 is a harmonizing pastel in the same tonal family. Keyed by a
+// speaker's index in the conversation's agent roster (max 2 agents in group mode).
+export const speakerMessageColors = ['#CADEEA', '#CAEAD6'];
+
 export default theme;

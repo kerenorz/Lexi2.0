@@ -1,5 +1,4 @@
 import { Pages } from '@app/App';
-import { Button } from '@mui/material';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -13,9 +12,6 @@ import {
 
 const ProjectOverview: React.FC = () => {
     const navigate = useNavigate();
-    const handleGitHubRedirect = () => {
-        window.location.href = 'https://github.com/veb7vmehra/Lexi2.0';
-    };
 
     const handleAdminRedirect = () => {
         navigate(Pages.ADMIN);
@@ -37,9 +33,6 @@ const ProjectOverview: React.FC = () => {
                     field of user interaction with bots and Language Learning & Agenting Systems (LLMS).
                 </StyledTypography>
                 <StyledPaper>
-                    <Button variant="contained" sx={{ marginRight: 2 }} onClick={handleGitHubRedirect}>
-                        Visit GitHub
-                    </Button>
                     <StyledTypography display="inline" sx={{ marginRight: 2 }}>
                         Are you an admin?
                     </StyledTypography>

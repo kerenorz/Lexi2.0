@@ -6,7 +6,11 @@ const LoginExperimentRoute = ({ TopBar, setIsOpen }) => {
     const { activeUser } = useActiveUser();
     const { experimentId } = useParams();
 
-    if (!activeUser) {
+    const hasValidSessionForExperiment =
+        !!activeUser &&
+        (activeUser.role !== 'participant' || activeUser.experimentId === experimentId);
+
+    if (!hasValidSessionForExperiment) {
         return (
             <>
                 <TopBar setIsOpen={setIsOpen} />

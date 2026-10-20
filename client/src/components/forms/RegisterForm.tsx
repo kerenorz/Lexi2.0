@@ -1,4 +1,5 @@
 import { setActiveUser } from '@DAL/redux/reducers/activeUserReducer';
+import { extractError } from '@DAL/extractError';
 import { registerUser } from '@DAL/server-requests/users';
 import { SnackbarStatus, useSnackbar } from '@contexts/SnackbarProvider';
 import { NewUserInfoType } from '@models/AppModels';
@@ -15,9 +16,18 @@ import TermsOfConditions from './terms-of-conditions/TermsOfConditions';
 interface RegisterFormProps {
     experimentId: string;
     setShowFormTypeButtons: (show: boolean) => void;
+    // Survey-embedded use only. externalPid joins our export to the survey's; onRegistered
+    // replaces the redux hand-off, since the embedded chat gets its session from the entry route.
+    externalPid?: string;
+    onRegistered?: () => void;
 }
 
-export const RegisterForm: React.FC<RegisterFormProps> = ({ experimentId, setShowFormTypeButtons }) => {
+export const RegisterForm: React.FC<RegisterFormProps> = ({
+    experimentId,
+    setShowFormTypeButtons,
+    externalPid,
+    onRegistered,
+}) => {
     const [page, setPage] = useState(1);
     const [form, setForm] = useState(null);
     const dispatch = useDispatch();
@@ -52,14 +62,24 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ experimentId, setSho
 
     const onSubmit = async (data: NewUserInfoType) => {
         try {
-            const user = await registerUser(data, experimentId);
+            const user = await registerUser(
+                { ...data, ...(externalPid ? { externalPid } : {}) },
+                experimentId,
+            );
+            // Embedded: keep this user out of redux. The framed chat uses the entry route's token.
+            if (onRegistered) {
+                onRegistered();
+                return;
+            }
             dispatch(setActiveUser(user));
         } catch (error) {
             if (error?.response?.status === 403) {
-                openSnackbar('Experiment Is Not Active', SnackbarStatus.ERROR);
+                const { message } = extractError(error, 'Experiment Is Not Active');
+                openSnackbar(message, SnackbarStatus.ERROR);
                 return;
             }
-            openSnackbar('Registration Failed', SnackbarStatus.ERROR);
+            const { message } = extractError(error, 'Registration Failed');
+            openSnackbar(message, SnackbarStatus.ERROR);
         }
     };
 

@@ -1,3 +1,20 @@
 /openFace/
 docker-compose.yml
 ./git-filter-repo
+# Elastic Beanstalk Files
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml
+
+# Build artifacts and local config
+node_modules/
+scratch/
+*.tmp.js
+.claude/settings.local.json
+audit-report.md
+phaseA-report.md
+phaseD-report.md
+
+# Local e2e artifacts (built on demand by tests/e2e/build-client.mjs)
+client/build-e2e/
+server/client/

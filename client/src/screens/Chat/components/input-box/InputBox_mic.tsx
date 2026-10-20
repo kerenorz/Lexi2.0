@@ -8,6 +8,9 @@ import StopIcon from '@mui/icons-material/Stop';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { Box, Button, IconButton, Typography } from '@mui/material';
 import { sendMessage, sendStreamMessage, sendAudio } from '../../../../DAL/server-requests/conversations';
+import { extractError } from '../../../../DAL/extractError';
+import { createStreamReveal, StreamReveal } from './streamReveal';
+import { newClientMessageId } from './clientMessageId';
 import { StyledInputBase, StyledInputBox } from './InputBox.s';
 
 interface InputBoxProps {
@@ -18,6 +21,8 @@ interface InputBoxProps {
     setIsMessageLoading: (isLoading: boolean) => void;
     fontSize: string;
     isStreamMessage: boolean;
+    // Words per minute for the streamed reveal. Undefined uses the default.
+    streamWordsPerMinute?: number;
 }
 
 const InputBox_mic: React.FC<InputBoxProps> = ({
@@ -28,6 +33,7 @@ const InputBox_mic: React.FC<InputBoxProps> = ({
     setMessages,
     setIsMessageLoading,
     isStreamMessage,
+    streamWordsPerMinute,
 }) => {
     const { openSnackbar } = useSnackbar();
     const [message, setMessage] = useState('');
@@ -41,7 +47,13 @@ const InputBox_mic: React.FC<InputBoxProps> = ({
     const timerRef = useRef<number | null>(null);
     const [hasAudio, setHasAudio] = useState(false);
 
-    // Audio visualizer setup
+    // True until the reveal finishes; two concurrent streams would mix into one bubble.
+    const isStreamInFlightRef = useRef(false);
+    // When the first character became visible, not when the first token arrived.
+    const streamStartedAtRef = useRef<number | null>(null);
+    // Held so unmount can flush it.
+    const revealRef = useRef<StreamReveal | null>(null);
+
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
     const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
@@ -60,6 +72,15 @@ const InputBox_mic: React.FC<InputBoxProps> = ({
         };
     }, [isRecording]);
 
+    // On unmount show the full reply; it is already saved server-side.
+    useEffect(
+        () => () => {
+            revealRef.current?.finish();
+            revealRef.current = null;
+        },
+        [],
+    );
+
     const handleSend = () => {
         if (hasAudio && audioBlob) {
           handleAudio();
@@ -77,13 +98,15 @@ const InputBox_mic: React.FC<InputBoxProps> = ({
             return;
         }
         const messageContent: Blob = audioBlob;
-        const conversation: AudioType[] = [...messages, { content: messageContent, role: 'user' }];
+        // Lets the server de-duplicate re-sends (clientMessageId.ts).
+        const clientMessageId = newClientMessageId();
+        const conversation: AudioType[] = [...messages, { content: messageContent, role: 'user', clientMessageId }];
         setMessages(conversation);
         setMessage('');
         setIsMessageLoading(true);
         try {
             {
-                const response = await sendAudio({ content: messageContent, role: 'user' }, conversationId);
+                const response = await sendAudio({ content: messageContent, role: 'user', clientMessageId }, conversationId);
                 console.log(response)
                 setMessages((prevMessages) => [...prevMessages, response]);
                 setIsMessageLoading(false);
@@ -94,7 +117,7 @@ const InputBox_mic: React.FC<InputBoxProps> = ({
         }
 
 
-        setAudioBlob(null); // Clear audio after sending
+        setAudioBlob(null);
         setHasAudio(false);
     };
     
@@ -117,7 +140,7 @@ const InputBox_mic: React.FC<InputBoxProps> = ({
             setIsRecording(true);
             setRecordingTime(0);
 
-            // Setup AudioContext for visualizer
+            // Visualizer
             const audioCtx = new AudioContext();
             const analyserNode = audioCtx.createAnalyser();
             analyserNode.fftSize = 256;
@@ -126,7 +149,6 @@ const InputBox_mic: React.FC<InputBoxProps> = ({
             setAudioContext(audioCtx);
             setAnalyser(analyserNode);
 
-            // Start animation
             visualizeAudio(analyserNode);
         } catch (error) {
             console.error('Error accessing microphone:', error);
@@ -149,7 +171,6 @@ const InputBox_mic: React.FC<InputBoxProps> = ({
             setAnimationId(null);
         }
 
-        // Clear the canvas when stopping
         const canvas = canvasRef.current;
         if (canvas) {
             const ctx = canvas.getContext('2d');
@@ -163,7 +184,7 @@ const InputBox_mic: React.FC<InputBoxProps> = ({
         const canvas = canvasRef.current;
         if (!canvasRef.current) {
             console.error("Canvas not found - Retrying in 500ms...");
-            setTimeout(() => visualizeAudio(analyser), 500); // Retry after 500ms
+            setTimeout(() => visualizeAudio(analyser), 500);
             return;
         }
         const ctx = canvas.getContext('2d');
@@ -236,23 +257,32 @@ const InputBox_mic: React.FC<InputBoxProps> = ({
             openSnackbar('Message cannot be empty', SnackbarStatus.WARNING);
             return;
         }
+        // Refuse before mutating anything, or the message shows but is never sent.
+        if (isStreamInFlightRef.current) {
+            openSnackbar('Please wait for the current reply to finish.', SnackbarStatus.WARNING);
+            return;
+        }
         const messageContent: string = message || errorMessage;
-        const conversation: MessageType[] = [...messages, { content: messageContent, role: 'user' }];
+        // Lets the server de-duplicate re-sends (clientMessageId.ts).
+        const clientMessageId = newClientMessageId();
+        const conversation: MessageType[] = [...messages, { content: messageContent, role: 'user', clientMessageId }];
         setMessages(conversation);
         setMessage('');
+
         setIsMessageLoading(true);
         try {
-            if (isStreamMessage && false) {
-                sendStreamMessage(
-                    { content: messageContent, role: 'user' },
-                    conversationId,
-                    onStreamMessage,
-                    onCloseStream,
-                    (error) => onMessageError(conversation, messageContent, error),
-                );
+            if (isStreamMessage) {
+                isStreamInFlightRef.current = true;
+                streamStartedAtRef.current = null;
+                try {
+                    await runStreamedTurn(conversation, messageContent, clientMessageId);
+                } finally {
+                    isStreamInFlightRef.current = false;
+                }
             } else {
-                const response = await sendMessage({ content: messageContent, role: 'user' }, conversationId);
-                setMessages((prevMessages) => [...prevMessages, response]);
+                const response = await sendMessage({ content: messageContent, role: 'user', clientMessageId }, conversationId);
+                // sendMessage returns an array; spread it.
+                setMessages((prevMessages) => [...prevMessages, ...response]);
                 setIsMessageLoading(false);
                 setErrorMessage(null);
             }
@@ -263,43 +293,108 @@ const InputBox_mic: React.FC<InputBoxProps> = ({
 
     const onMessageError = (conversation, messageContent, error) => {
         setIsMessageLoading(false);
+        const { message: errorText, isNetworkError } = extractError(error, "Couldn't send message");
         setMessages([
             ...conversation,
             {
-                content:
-                    error.response && error.response.status && error.response.status === 403
-                        ? 'Messeges Limit Exceeded'
-                        : error?.response?.status === 400
-                          ? 'Message Is Too Long'
-                          : 'Network Error',
+                content: errorText,
                 role: 'assistant',
             },
         ]);
-        openSnackbar('Failed to send message', SnackbarStatus.ERROR);
+        if (isNetworkError) {
+            openSnackbar(errorText, SnackbarStatus.ERROR);
+        }
         setErrorMessage(messageContent);
     };
 
-    const onCloseStream = (message: MessageType) => {
-        setMessages((prevMessages) => [
-            ...prevMessages.slice(0, -1),
-            { ...prevMessages[prevMessages.length - 1], _id: message._id, userAnnotation: message.userAnnotation },
-        ]);
+    // Resolves when the reveal finishes, not when the network closes, so the in-flight guard
+    // covers the whole animation.
+    const runStreamedTurn = async (conversation: MessageType[], messageContent: string, clientMessageId: string) => {
+        let saved: MessageType | null = null;
+        let aborted = false;
+        // First onText appends the bubble, later ones replace it. Outside the updater, which React may run twice.
+        let bubbleCreated = false;
+
+        let resolveReveal!: () => void;
+        const revealFinished = new Promise<void>((resolve) => {
+            resolveReveal = resolve;
+        });
+
+        const reveal = createStreamReveal({
+            wpm: streamWordsPerMinute,
+            onText: (visible) => {
+                setIsMessageLoading(false);
+                if (streamStartedAtRef.current === null) streamStartedAtRef.current = Date.now();
+                const isFirst = !bubbleCreated;
+                bubbleCreated = true;
+                setMessages((prevMessages) => {
+                    const lastMessage = prevMessages[prevMessages.length - 1];
+                    if (isFirst || !lastMessage || lastMessage.role !== 'assistant') {
+                        return [...prevMessages, { content: visible, role: 'assistant' }];
+                    }
+                    return [...prevMessages.slice(0, -1), { ...lastMessage, content: visible }];
+                });
+                setErrorMessage(null);
+            },
+            onComplete: () => resolveReveal(),
+        });
+        revealRef.current = reveal;
+
+        await sendStreamMessage(
+            { content: messageContent, role: 'user', clientMessageId },
+            conversationId,
+            (chunk) => reveal.push(chunk),
+            (savedMessage) => {
+                saved = savedMessage;
+            },
+            (error) => {
+                aborted = true;
+                reveal.cancel();
+                resolveReveal();
+                onMessageError(conversation, messageContent, error);
+            },
+            // Human Deception overrides streaming and returns paced segments; just append them.
+            (segments) => {
+                aborted = true;
+                reveal.cancel();
+                resolveReveal();
+                setMessages((prevMessages) => [...prevMessages, ...segments]);
+                setIsMessageLoading(false);
+                setErrorMessage(null);
+            },
+        );
+
+        if (!aborted) reveal.endInput();
+        await revealFinished;
+        revealRef.current = null;
+
+        if (aborted || !saved) return;
+        finalizeStreamedReply(saved);
     };
 
-    const onStreamMessage = (assistantMessagePart: string) => {
+    // Attach the saved _id after the reveal drains; it arrives well before the reveal ends.
+    const finalizeStreamedReply = (message: MessageType) => {
         setIsMessageLoading(false);
+        streamStartedAtRef.current = null;
         setMessages((prevMessages) => {
             const lastMessage = prevMessages[prevMessages.length - 1];
-            if (lastMessage && lastMessage.role === 'assistant') {
+            // Empty completion: the last bubble is the user's, so append rather than stamp it.
+            if (!lastMessage || lastMessage.role !== 'assistant') {
                 return [
-                    ...prevMessages.slice(0, -1),
-                    { ...lastMessage, content: lastMessage.content + assistantMessagePart },
+                    ...prevMessages,
+                    {
+                        content: message.content ?? '',
+                        role: 'assistant',
+                        _id: message._id,
+                        userAnnotation: message.userAnnotation,
+                    },
                 ];
             }
-
-            return [...prevMessages, { content: assistantMessagePart, role: 'assistant' }];
+            return [
+                ...prevMessages.slice(0, -1),
+                { ...lastMessage, _id: message._id, userAnnotation: message.userAnnotation },
+            ];
         });
-        setErrorMessage(null);
     };
 
     const handleKeyDown = (event) => {
@@ -336,6 +431,8 @@ const InputBox_mic: React.FC<InputBoxProps> = ({
                         fullWidth
                         placeholder={isRecording ? "Recording in progress..." : "Type a message…"}
                         multiline
+                        // Direction follows the typed text (Hebrew or English).
+                        inputProps={{ dir: 'auto' }}
                         maxRows={5}
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}

@@ -16,6 +16,6 @@ If you encounter issues during the setup process, here are some steps to trouble
 
 - **Check Internet Connection**: Ensure you have a stable internet connection. Connection issues can sometimes be mistaken for configuration problems.
 
-- **Update Node.js and NPM**: Ensure that you are using the latest versions of Node.js and NPM. Outdated versions can sometimes cause compatibility issues.
+- **Use Node.js 22**: Ensure that you are using Node.js 22 and the npm that ships with it. That is the major the Elastic Beanstalk platform runs, and every `engines` field in the repo names it (`>=22.0.0 <23.0.0`). A newer major is not "more up to date" here: npm warns `EBADENGINE` on it, and it is not what production runs.
 
 By following these troubleshooting steps, you should be able to resolve common setup issues. If problems persist, consider reaching out to the support community or forums for additional help.

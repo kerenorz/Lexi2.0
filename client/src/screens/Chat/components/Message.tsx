@@ -11,6 +11,7 @@ interface MessageProps {
     size?: 'sm' | 'lg';
     experimentHasUserAnnotation: boolean;
     handleUpdateUserAnnotation: (messageId, userAnnotation) => void;
+    speakerColor?: string;
 }
 
 const Message: React.FC<MessageProps> = ({
@@ -19,8 +20,12 @@ const Message: React.FC<MessageProps> = ({
     message,
     role,
     handleUpdateUserAnnotation,
+    speakerColor,
 }) => {
     const isUser = role === "user";
+    // Group messages carry speakerName: show a label and the speaker's color.
+    const isGroupSpeaker = !isUser && !!message.speakerName;
+    const assistantBg = isGroupSpeaker && speakerColor ? speakerColor : theme.palette.assistantMessage.main;
     const waveformRef = useRef(null);
     const wavesurferRef = useRef<WaveSurfer | null>(null);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -41,7 +46,6 @@ const Message: React.FC<MessageProps> = ({
         };
     }, [message.content]);
 
-    // Initialize WaveSurfer for audio messages
     useEffect(() => {
         if (audioUrl && waveformRef.current) {
             wavesurferRef.current = WaveSurfer.create({
@@ -98,12 +102,28 @@ const Message: React.FC<MessageProps> = ({
             }}
         >
             <Box display={'flex'} flexDirection={'column'}>
+                {isGroupSpeaker && (
+                    <Typography
+                        // Hebrew names need their own direction, as below.
+                        dir="auto"
+                        sx={{
+                            fontFamily: 'Lato',
+                            fontWeight: 700,
+                            fontSize: size === 'sm' ? '0.8rem' : '0.95rem',
+                            color: theme.palette.primary.main,
+                            marginBottom: '2px',
+                            marginLeft: '8px',
+                        }}
+                    >
+                        {message.speakerName}
+                    </Typography>
+                )}
                 <Box
                     sx={{
                         marginBottom: 1,
                         padding: '16px 16px 24px 16px',
                         borderRadius: isUser ? '26px 26px 0 26px' : '26px 26px 26px 0',
-                        background: isUser ? theme.palette.userMessage.main : theme.palette.assistantMessage.main,
+                        background: isUser ? theme.palette.userMessage.main : assistantBg,
                         display: 'inline-block',
                         clear: 'both',
                         float: isUser ? 'right' : 'left',
@@ -120,6 +140,9 @@ const Message: React.FC<MessageProps> = ({
                     ) : (
                         <Typography
                             variant="body2"
+                            // Per-message direction so Hebrew punctuation lands on the right.
+                            // `auto`, not `rtl`, since English studies use this too.
+                            dir="auto"
                             sx={{
                                 whiteSpace: "pre-line",
                                 fontSize: size === "sm" ? "1rem" : "1.25rem",

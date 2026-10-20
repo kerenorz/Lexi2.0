@@ -1,4 +1,4 @@
-import { AbAgentsType, AgentType, FormType } from '@models/AppModels';
+import { AbAgentsType, AgentPacing, AgentType, FormType, TurnTakingConfig } from '@models/AppModels';
 
 export const defaultSliderSettings = {
     temperature: 1,
@@ -6,23 +6,61 @@ export const defaultSliderSettings = {
     topP: 1,
     frequencyPenalty: 0,
     presencePenalty: 0,
-    cameraCaptureRate: 5,
     audioInput: 1,
-    vaIntegration: 1,
 } as const;
 
-export const agentsOptions = ['gpt-3.5-turbo', 'gpt-4-1106-preview', 'gpt-4o', 'gpt-4o-mini'] as const;
+// The model list is served by GET /agents/models (server modelCatalogue.ts).
+
+// Seeded when "Response pace" is switched on. Keep in sync with the server's DEFAULT_PACING.
+// typingSpeed is omitted so it falls back to the agent's inverseTimeDelay.
+export const defaultPacing: AgentPacing = {
+    typingSpeedVariation: 0.22,
+    preTypingDelayMsMean: 900,
+    preTypingDelayMsRange: 600,
+    splitProbability: 0.35,
+    maxSegments: 3,
+};
+
+// Mirrors the server's isHumanized; every form must use this one. The explicit flag wins
+// both ways, so an agent saved with HD off stays off even with pacing data kept.
+export const isAgentDocHumanized = (agent: {
+    humanized?: boolean;
+    inverseTimeDelay?: number | null;
+    pacing?: unknown;
+}): boolean => {
+    if (!agent) return false;
+    if (agent.humanized === true) return true;
+    if (agent.humanized === false) return false;
+    if (agent.inverseTimeDelay != null) return true;
+    const p = agent.pacing;
+    return p != null && typeof p === 'object' && Object.keys(p).length > 0;
+};
+
+// Mirrors the server's isSplitEnabled. The explicit flag wins both ways; without one the
+// server decides by humanization, so this does too.
+export const isAgentDocSplitting = (agent: {
+    humanized?: boolean;
+    inverseTimeDelay?: number | null;
+    pacing?: { enabled?: { split?: boolean } } | null;
+}): boolean => {
+    if (!agent) return false;
+    const flag = agent.pacing?.enabled?.split;
+    if (flag === true) return true;
+    if (flag === false) return false;
+    return isAgentDocHumanized(agent);
+};
 
 export const defaultSettings: AgentType = {
     _id: '',
     title: '',
+    displayName: '',
     summary: '',
     systemStarterPrompt: '',
     beforeUserSentencePrompt: '',
     afterUserSentencePrompt: '',
     inverseTimeDelay: null,
     firstChatSentence: '',
-    model: agentsOptions[0],
+    model: 'gpt-4o-mini',
     temperature: null,
     maxTokens: null,
     topP: null,
@@ -32,6 +70,7 @@ export const defaultSettings: AgentType = {
     audioInput: null,
     vaIntegration: null,
     stopSequences: [],
+    // No `pacing` key: mongoose would persist an explicit null onto every new agent.
 };
 
 export const defaultAbAgents: AbAgentsType = {
@@ -40,6 +79,54 @@ export const defaultAbAgents: AbAgentsType = {
     agentB: null,
     distB: 50,
 } as const;
+
+// Attached to an experiment only when Group mode is chosen.
+export const defaultGroupAgents: string[] = [];
+
+// Seeded onto new group experiments only; never merged over a stored turnTaking. Thread
+// control and memoryWindow default off because they sit behind the unticked "Conversation
+// phases" checkbox, and hidden must mean off. GroupAgents must seed these leaf paths
+// individually: a parent setValue doesn't reach Controllers with their own defaultValue.
+export const defaultTurnTaking: TurnTakingConfig = {
+    policy: 'rules',
+    maxAgentTurnsPerRound: 2,
+    silenceChance: 0,
+    perAgentProbability: {},
+    autonomousLevel: 'off',
+    autonomousRounds: 0,
+    identifyHumanParticipant: false,
+    // Never prefilled: forgotten example text would become the study's setting.
+    scene: '',
+    threadControl: {
+        enabled: false,
+        groundChance: 0.2,
+        shiftChance: 0.15,
+        returnChance: 0.05,
+        closeChance: 0.08,
+    },
+    memoryWindow: false,
+};
+
+// Thread-control slider bounds. The sum cap leaves 'continue' (an ordinary reply) some share.
+export const MAX_MOVE_CHANCE = 0.5;
+export const MAX_MOVE_CHANCE_SUM = 1;
+
+// Stream Message reveal rate in words per minute, 5 characters per word. 200 is fast but
+// human (a 150-word reply in ~45s). Only paces the client reveal, not the provider stream.
+export const DEFAULT_STREAM_WPM = 200;
+export const MIN_STREAM_WPM = 10;
+export const MAX_STREAM_WPM = 2000;
+export const CHARS_PER_WORD = 5;
+
+// Milliseconds each character should wait before it is revealed.
+export const msPerRevealedChar = (wpm?: number | null): number => {
+    const rate = Number(wpm);
+    const safe =
+        Number.isFinite(rate) && rate > 0
+            ? Math.min(MAX_STREAM_WPM, Math.max(MIN_STREAM_WPM, rate))
+            : DEFAULT_STREAM_WPM;
+    return 60000 / (safe * CHARS_PER_WORD);
+};
 
 export const defaultExperiment = {
     title: '',
@@ -64,6 +151,7 @@ export const defaultExperiment = {
     experimentFeatures: {
         userAnnotation: false,
         streamMessage: false,
+        streamWordsPerMinute: DEFAULT_STREAM_WPM,
     },
 } as const;
 
@@ -73,9 +161,7 @@ export const initialSlidersEnabled = {
     topPEnabled: false,
     frequencyPenaltyEnabled: false,
     presencePenaltyEnabled: false,
-    cameraCaptureRateEnabled: false,
     audioInputEnabled: false,
-    vaIntegrationEnabled: false,
 } as const;
 
 export const ApiPaths = {
@@ -85,7 +171,7 @@ export const ApiPaths = {
     AGENTS_PATH: 'agents',
     EXPERIMENTS_PATH: 'experiments',
     FORMS_PATH: 'forms',
-    FOLDER_DOWNLOAD_PATH: 'folderDownload',
+    API_KEYS_PATH: 'apiKeys',
 } as const;
 
 export const AdminSections = {
@@ -94,6 +180,7 @@ export const AdminSections = {
     FORMS: 'forms',
     DATA: 'data',
     SETTINGS: 'settings',
+    USERS: 'users',
 } as const;
 
 export const defaultQuestionProps = {

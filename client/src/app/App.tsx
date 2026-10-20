@@ -14,17 +14,26 @@ export const Pages = {
     EXPERIMENT: '/e/:experimentId',
     EXPERIMENT_CONVERSATION: '/e/:experimentId/c/:conversationId',
     EXPERIMENT_LOGIN: '/e/:experimentId/login',
+    // Survey-embedded entry: /e/:experimentId/s?pid=...&segment=N
+    // Outside the participant route guard: the survey's pid is the credential, there is no session yet.
+    EXPERIMENT_SEGMENT: '/e/:experimentId/s',
     GENERAL_LOGIN: 'login',
 } as const;
+
+const isPrivilegedUser = (user: any) => user?.role === 'admin' || user?.role === 'user';
+
+// Module scope on purpose: inside App, each render made new lazy types that suspended again,
+// flashing the loading page whenever App's state changed.
+const SegmentEntry = lazy(() => import('@screens/Chat/SegmentEntry'));
+const Home = lazy(() => import('@screens/Home/Home'));
+const Admin = lazy(() => import('@screens/Admin/Admin'));
+const ChatPage = lazy(() => import('@screens/Chat/ChatPage'));
+const Login = lazy(() => import('@screens/Login/Login'));
+const TopBar = lazy(() => import('@components/top-bar/TopBar'));
 
 const App: FC = () => {
     const { activeUser, isLoading } = useActiveUser();
     const [openEndConversationDialog, setOpenEndConversationDialog] = useState(false);
-    const Home = lazy(() => import('@screens/Home/Home'));
-    const Admin = lazy(() => import('@screens/Admin/Admin'));
-    const ChatPage = lazy(() => import('@screens/Chat/ChatPage'));
-    const Login = lazy(() => import('@screens/Login/Login'));
-    const TopBar = lazy(() => import('@components/top-bar/TopBar'));
 
     return (
         <BrowserRouter>
@@ -46,12 +55,12 @@ const App: FC = () => {
                         {/* Admin Routes */}
                         <Route
                             path={`${Pages.ADMIN}/*`}
-                            element={activeUser?.isAdmin ? <Admin /> : <Navigate to={Pages.ADMIN_LOGIN} />}
+                            element={isPrivilegedUser(activeUser) ? <Admin /> : <Navigate to={Pages.ADMIN_LOGIN} />}
                         />
                         <Route
                             path={Pages.ADMIN_LOGIN}
                             element={
-                                activeUser && activeUser?.isAdmin ? (
+                                activeUser && isPrivilegedUser(activeUser) ? (
                                     <Navigate to={Pages.ADMIN} replace />
                                 ) : (
                                     <>
@@ -59,6 +68,17 @@ const App: FC = () => {
                                         <Login />
                                     </>
                                 )
+                            }
+                        />
+
+                        {/* Survey-embedded chat. No TopBar, so no Logout mid-study. */}
+                        <Route
+                            path={Pages.EXPERIMENT_SEGMENT}
+                            element={
+                                <SegmentEntry
+                                    isFinishDialogOpen={openEndConversationDialog}
+                                    setIsFinishDialogOpen={setOpenEndConversationDialog}
+                                />
                             }
                         />
 
@@ -93,7 +113,7 @@ const App: FC = () => {
                             path="*"
                             element={
                                 <Navigate
-                                    to={activeUser?.isAdmin ? Pages.ADMIN : Pages.PROJECT_OVERVIEW}
+                                    to={isPrivilegedUser(activeUser) ? Pages.ADMIN : Pages.PROJECT_OVERVIEW}
                                     replace
                                 />
                             }

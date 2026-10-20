@@ -11,6 +11,11 @@ interface MessageListProps {
     size: 'sm' | 'lg';
     handleUpdateUserAnnotation: (messageId, userAnnotation) => void;
     experimentHasUserAnnotation: boolean;
+    speakerColors?: Record<string, string>;
+    // One indicator per agent typing. Empty = default dots.
+    typingColors?: string[];
+    // Delay before the default dots show.
+    typingIndicatorDelayMs?: number;
 }
 
 const MessageList: React.FC<MessageListProps> = ({
@@ -20,32 +25,34 @@ const MessageList: React.FC<MessageListProps> = ({
     size,
     experimentHasUserAnnotation,
     handleUpdateUserAnnotation,
+    speakerColors,
+    typingColors,
+    typingIndicatorDelayMs = 500,
 }) => {
+    // By speakerId, then speakerName. Undefined = default color.
+    const resolveSpeakerColor = (message: MessageType): string | undefined => {
+        if (!speakerColors) return undefined;
+        return (
+            (message.speakerId && speakerColors[message.speakerId]) ||
+            (message.speakerName && speakerColors[message.speakerName]) ||
+            undefined
+        );
+    };
 
     const [showLoadingDots, setShowLoadingDots] = useState(false);
 
     useEffect(() => {
-
-
         let timer;
         if (isMessageLoading) {
             timer = setTimeout(() => {
                 setShowLoadingDots(true);
-            }, 500);
+            }, typingIndicatorDelayMs);
         } else {
-            setShowLoadingDots(false)
+            setShowLoadingDots(false);
         }
-        console.log('MessageList props:', {
-            isMobile,
-            messages,
-            isMessageLoading,
-            size,
-            experimentHasUserAnnotation,
-            handleUpdateUserAnnotation,
-        });
 
         return () => clearTimeout(timer);
-    }, [isMobile, messages, isMessageLoading, size, experimentHasUserAnnotation, handleUpdateUserAnnotation]);
+    }, [isMessageLoading, typingIndicatorDelayMs]);
 
     return (
     <Box height="100%" width={isMobile ? '100%' : '85%'} padding={2}>
@@ -57,9 +64,13 @@ const MessageList: React.FC<MessageListProps> = ({
                 size={size}
                 handleUpdateUserAnnotation={handleUpdateUserAnnotation}
                 experimentHasUserAnnotation={experimentHasUserAnnotation}
+                speakerColor={resolveSpeakerColor(message)}
             />
         ))}
-        {showLoadingDots && <LoadingDots />}
+        {/* Keyed by color (speaker), not index, so a handoff shows a new bubble rather than one changing color. */}
+        {typingColors && typingColors.length > 0
+            ? typingColors.map((color) => <LoadingDots key={color} color={color} />)
+            : showLoadingDots && <LoadingDots />}
     </Box>
 );
 };

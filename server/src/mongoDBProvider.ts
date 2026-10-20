@@ -12,21 +12,24 @@ class MongoDbProvider {
 
     private initializeConnection() {
         console.log('Connecting to MongoDB...');
+
+        const uri = process.env.MONGODB_URL;
+
+        if (!uri) {
+            console.error('MONGODB_URL environment variable is not set');
+            process.exit(1);
+        }
+
         mongoose
-            .connect(`${process.env.MONGODB_URL}/${process.env.MONGODB_DB_NAME}`, {
-                ssl: true,
-                auth: {
-                    username: process.env.MONGODB_USER,
-                    password: process.env.MONGODB_PASSWORD,
-                },
-                retryWrites: true,
-                w: 'majority',
+            .connect(uri, {
+                serverSelectionTimeoutMS: 5000,
             })
             .then(() => {
                 console.log('Successfully connected to MongoDB');
             })
             .catch((err) => {
                 console.error('Could not connect to MongoDB...', err);
+                process.exit(1);
             });
     }
 

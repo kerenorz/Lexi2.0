@@ -5,7 +5,6 @@ import useActiveUser from '@hooks/useActiveUser';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ExitToAppOutlinedIcon from '@mui/icons-material/ExitToAppOutlined';
-import GitHubIcon from '@mui/icons-material/GitHub';
 import { Box, IconButton, Menu, MenuItem, useMediaQuery } from '@mui/material';
 import theme from '@root/Theme';
 import { useState } from 'react';
@@ -67,7 +66,7 @@ const TopBar: React.FC<TopBarProps> = (props) => {
                     </Box>
                 )}
                 <Box display="flex" gap="20px" alignItems="center">
-                    {activeUser && activeUser.isAdmin && (
+                    {activeUser && (activeUser.role === 'admin' || activeUser.role === 'user') && (
                         <>
                             <IconButton color="inherit" edge="end" onClick={handleMenu}>
                                 <AccountCircleIcon style={{ fontSize: isLargerThanLaptop ? 40 : 30 }} />
@@ -102,16 +101,7 @@ const TopBar: React.FC<TopBarProps> = (props) => {
                             </Menu>
                         </>
                     )}
-                    {location.pathname === Pages.PROJECT_OVERVIEW && (
-                        <IconButton
-                            color="inherit"
-                            href="https://github.com/veb7vmehra/Lexi2.0"
-                            sx={{ textTransform: 'none' }}
-                        >
-                            <GitHubIcon style={{ fontSize: isLargerThanLaptop ? 40 : 28 }} />
-                        </IconButton>
-                    )}
-                    {activeUser && !activeUser.isAdmin && (
+                    {activeUser && activeUser.role === 'participant' && (
                         <LogoutButton size="small" variant="outlined" onClick={handleLogout}>
                             Logout
                         </LogoutButton>

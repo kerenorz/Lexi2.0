@@ -1,6 +1,8 @@
+import FieldInfo from '@components/common/FieldInfo';
 import { SnackbarStatus, useSnackbar } from '@contexts/SnackbarProvider';
 import Autocomplete from '@mui/material/Autocomplete';
 import Chip from '@mui/material/Chip';
+import InputAdornment from '@mui/material/InputAdornment';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import * as React from 'react';
@@ -12,6 +14,7 @@ interface ChipsInputProps {
     id: string;
     placeholder?: string;
     helperText?: string;
+    info?: string;
 }
 
 export const ChipsInput: React.FC<ChipsInputProps> = (props) => {
@@ -78,6 +81,19 @@ export const ChipsInput: React.FC<ChipsInputProps> = (props) => {
                         label={props.label}
                         placeholder={props.placeholder}
                         helperText={props.helperText}
+                        InputProps={{
+                            ...params.InputProps,
+                            endAdornment: (
+                                <>
+                                    {params.InputProps?.endAdornment}
+                                    {props.info && (
+                                        <InputAdornment position="end">
+                                            <FieldInfo text={props.info} />
+                                        </InputAdornment>
+                                    )}
+                                </>
+                            ),
+                        }}
                     />
                 )}
                 onChange={validateInput}

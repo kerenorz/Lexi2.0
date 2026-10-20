@@ -1,9 +1,10 @@
 import { MoreOptionsMenu } from '@components/common/MoreOptionsMenu';
 import { AgentLeanType, ExperimentType } from '@models/AppModels';
+import ErrorIcon from '@mui/icons-material/Error';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import { Box, Collapse, IconButton, MenuItem, TableCell, TableRow, Tooltip, Typography } from '@mui/material';
+import { Box, Chip, Collapse, IconButton, MenuItem, TableCell, TableRow, Tooltip, Typography } from '@mui/material';
 import theme from '@root/Theme';
 import React, { useState } from 'react';
 import { ExperimentDetails } from '../experiments-details/ExperimentDetails';
@@ -13,14 +14,17 @@ interface ExperimentRowProps {
     row: ExperimentType;
     onStatusChange: (id: string, isActive: boolean) => void;
     handleMenuAction: (action: string, row: ExperimentType) => void;
+    // Per-owner color bar in 'Users' grouping; undefined in flat sort modes.
+    groupColor?: string;
 }
 
-export const ExperimentRow: React.FC<ExperimentRowProps> = ({ row, onStatusChange, handleMenuAction }) => {
+export const ExperimentRow: React.FC<ExperimentRowProps> = ({ row, onStatusChange, handleMenuAction, groupColor }) => {
     const [open, setOpen] = useState(false);
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [experimentAgentDetails, setExperimentAgentDetails] = useState<{
         activeAgent: AgentLeanType | null;
         abAgents: { agentA: AgentLeanType; agentB: AgentLeanType } | null;
+        groupAgents?: AgentLeanType[] | null;
     }>(null);
 
     const timeAgo = (timestamp: number) => {
@@ -71,13 +75,20 @@ export const ExperimentRow: React.FC<ExperimentRowProps> = ({ row, onStatusChang
     return (
         <React.Fragment>
             <TableRowStyled>
-                <TableCell>
+                <TableCell sx={groupColor ? { borderLeft: `4px solid ${groupColor}` } : undefined}>
                     <IconButton aria-label="expand row" size="small" onClick={() => setOpen(!open)}>
                         {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
                     </IconButton>
                 </TableCell>
                 <TableCell component="th" scope="row">
-                    {row.title}
+                    <Box display="flex" alignItems="center" gap={1}>
+                        <span>{row.title}</span>
+                        <Chip
+                            size="small"
+                            variant="outlined"
+                            label={`${row.numberOfParticipants ?? 0} participants`}
+                        />
+                    </Box>
                 </TableCell>
                 <TableCell>
                     <Tooltip title={row.description} placement="bottom">
@@ -111,24 +122,39 @@ export const ExperimentRow: React.FC<ExperimentRowProps> = ({ row, onStatusChang
                 </TableCell>
                 <TableCell>{timeAgo(row.timestamp)}</TableCell>
                 <TableCell>
-                    <ActiveExpSelect
-                        isActive={row.isActive}
-                        MenuProps={{
-                            PaperProps: {
-                                sx: {
-                                    '& .MuiMenuItem-root': {
-                                        fontSize: '0.875rem',
+                    <Box display="flex" alignItems="center" gap={0.5}>
+                        {/* Config warning (e.g. deleted agents) beside the status, which is
+                            deliberately not auto-deactivated. A button so touch and keyboard reach it. */}
+                        {row.configIssue && (
+                            <Tooltip title={row.configIssue.message} placement="top" enterTouchDelay={0}>
+                                <IconButton
+                                    size="small"
+                                    aria-label={row.configIssue.message}
+                                    sx={{ padding: '2px' }}
+                                >
+                                    <ErrorIcon sx={{ color: '#ed6c02', fontSize: '1.1rem' }} />
+                                </IconButton>
+                            </Tooltip>
+                        )}
+                        <ActiveExpSelect
+                            isActive={row.isActive}
+                            MenuProps={{
+                                PaperProps: {
+                                    sx: {
+                                        '& .MuiMenuItem-root': {
+                                            fontSize: '0.875rem',
+                                        },
                                     },
                                 },
-                            },
-                        }}
-                        value={row.isActive ? 'Active' : 'Inactive'}
-                        onChange={handleStatusChange}
-                        size="small"
-                    >
-                        <MenuItem value="Active">Active</MenuItem>
-                        <MenuItem value="Inactive">Inactive</MenuItem>
-                    </ActiveExpSelect>
+                            }}
+                            value={row.isActive ? 'Active' : 'Inactive'}
+                            onChange={handleStatusChange}
+                            size="small"
+                        >
+                            <MenuItem value="Active">Active</MenuItem>
+                            <MenuItem value="Inactive">Inactive</MenuItem>
+                        </ActiveExpSelect>
+                    </Box>
                 </TableCell>
                 <TableCell>
                     <IconButton onClick={handleMenuClick}>
@@ -138,6 +164,7 @@ export const ExperimentRow: React.FC<ExperimentRowProps> = ({ row, onStatusChang
                         anchorEl={anchorEl}
                         onMenuClose={handleMenuClose}
                         handleMenuAction={(action) => handleMenuAction(action, row)}
+                        showEmbedKit={Boolean(row.segments?.enabled)}
                     />
                 </TableCell>
             </TableRowStyled>

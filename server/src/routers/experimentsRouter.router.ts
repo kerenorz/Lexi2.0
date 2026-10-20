@@ -1,20 +1,26 @@
 import { Router } from 'express';
 import { experimentsController } from '../controllers/experimentsController.controller';
+import { authenticate, requireRole } from '../middleware/authMiddleware';
 
 export const experimentsRouter = () => {
     const router = Router();
-    router.get('/', experimentsController.getExperiments);
-    router.get('/agent', experimentsController.getAllExperimentsByAgentId);
+    const auth = [authenticate, requireRole('admin', 'user')];
+
+    // Admin/User routes (protected)
+    router.get('/', ...auth, experimentsController.getExperiments);
+    router.get('/agent', ...auth, experimentsController.getAllExperimentsByAgentId);
+    router.post('/create', ...auth, experimentsController.createExperiment);
+    router.put('/', ...auth, experimentsController.updateExperiment);
+    router.put('/status', ...auth, experimentsController.updateExperimentsStatus);
+    router.put('/content', ...auth, experimentsController.updateExperimentDisplaySetting);
+    router.delete('/:id', ...auth, experimentsController.deleteExperiment);
+
+    // Public routes (used by participant registration/login)
     router.get('/:id', experimentsController.getExperiment);
     router.get('/:id/features', experimentsController.getExperimentFeatures);
     router.get('/:id/content', experimentsController.getExperimentContent);
     router.get('/:id/registrationForm', experimentsController.getRegistrationForm);
     router.get('/:id/conversationForms', experimentsController.getConversationForms);
-    router.post('/create', experimentsController.createExperiment);
-    router.put('/', experimentsController.updateExperiment);
-    router.put('/status', experimentsController.updateExperimentsStatus);
-    router.put('/content', experimentsController.updateExperimentDisplaySetting);
-    router.delete('/:id', experimentsController.deleteExperiment);
 
     return router;
 };

@@ -1,13 +1,16 @@
+import FieldInfo from '@components/common/FieldInfo';
 import { FormControl, MenuItem, Select, Typography } from '@mui/material';
 import { Controller } from 'react-hook-form';
 
-const StyledSelection = ({ control, name, label, options, placeholder }) => (
+const StyledSelection = ({ control, name, label, options, placeholder, info }) => (
     <FormControl
         margin="dense"
         size="small"
         sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 1 }}
     >
-        <Typography>{label}:</Typography>
+        <Typography>
+            {label}:{info && <FieldInfo text={info} />}
+        </Typography>
         <Controller
             name={name}
             control={control}

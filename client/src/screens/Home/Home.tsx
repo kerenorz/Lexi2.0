@@ -1,7 +1,6 @@
-import { setActiveUser } from '@DAL/redux/reducers/activeUserReducer';
+import { extractError } from '@DAL/extractError';
 import { createConversation } from '@DAL/server-requests/conversations';
 import { getExperimentContent, updateExperimentDisplaySettings } from '@DAL/server-requests/experiments';
-import { logout } from '@DAL/server-requests/users';
 import { Pages } from '@app/App';
 import AsyncButton from '@components/common/AsyncButton';
 import LoadingPage from '@components/common/LoadingPage';
@@ -12,10 +11,9 @@ import { useExperimentId } from '@hooks/useExperimentId';
 import CancelIcon from '@mui/icons-material/Cancel';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
-import { Button, useMediaQuery } from '@mui/material';
+import { Button, Typography, useMediaQuery } from '@mui/material';
 import theme from '@root/Theme';
 import React, { useState } from 'react';
-import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import './Home.css';
 import {
@@ -31,7 +29,6 @@ import {
 const Home: React.FC = () => {
     const { activeUser } = useActiveUser();
     const { openSnackbar } = useSnackbar();
-    const dispatch = useDispatch();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const navigate = useNavigate();
     const experimentId = useExperimentId();
@@ -40,27 +37,25 @@ const Home: React.FC = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [editedContent, setEditedContent] = useState(null);
     const [experimentContent, setExperimentContent] = useState<any>(null);
+    // Participants only; a researcher on their own inactive study still gets the full page.
+    const [isStudyInactive, setIsStudyInactive] = useState(false);
 
     useEffectAsync(async () => {
         try {
             const { content, isActive } = await getExperimentContent(experimentId);
             setExperimentContent(content);
             if (!isActive) {
-                if (activeUser.isAdmin) {
+                if (activeUser.role === 'admin' || activeUser.role === 'user') {
                     openSnackbar('Experiment is not active', SnackbarStatus.WARNING);
                 } else {
-                    try {
-                        await logout();
-                    } catch (err) {
-                        console.log(err);
-                    }
-                    navigate(Pages.PROJECT_OVERVIEW);
-                    dispatch(setActiveUser(null));
-                    openSnackbar('Experiment is not active', SnackbarStatus.WARNING);
+                    // Stay here with a notice and keep the session. Logging out would 401-redirect
+                    // to the admin login, and re-registering later would create a second participant.
+                    setIsStudyInactive(true);
                 }
             }
         } catch (err) {
-            openSnackbar('Failed to load experiment', SnackbarStatus.ERROR);
+            const { message } = extractError(err, 'Failed to load experiment');
+            openSnackbar(message, SnackbarStatus.ERROR);
             navigate(Pages.PROJECT_OVERVIEW);
         }
         setIsLoadingPage(false);
@@ -83,7 +78,8 @@ const Home: React.FC = () => {
             setExperimentContent(editedContent);
             openSnackbar('Update Success', SnackbarStatus.SUCCESS);
         } catch (err) {
-            openSnackbar('Update Failed', SnackbarStatus.ERROR);
+            const { message } = extractError(err, 'Update Failed');
+            openSnackbar(message, SnackbarStatus.ERROR);
         }
         setIsEditing(false);
         setIsLoadingUpdate(false);
@@ -104,12 +100,25 @@ const Home: React.FC = () => {
             );
         } catch (err) {
             if (err?.response?.status === 403) {
-                openSnackbar('Converations Limit Exceeded', SnackbarStatus.ERROR);
+                const { message } = extractError(err, 'Conversations Limit Exceeded');
+                openSnackbar(message, SnackbarStatus.ERROR);
                 return;
             }
-            openSnackbar('Failed to start a new conversation', SnackbarStatus.ERROR);
+            const { message } = extractError(err, 'Failed to start a new conversation');
+            openSnackbar(message, SnackbarStatus.ERROR);
         }
     };
+
+    // Notice only: no welcome text, no "Start Conversation".
+    if (isStudyInactive) {
+        return (
+            <StyledContainer>
+                <Typography variant="h5" dir="auto" textAlign="center">
+                    This study is not currently active
+                </Typography>
+            </StyledContainer>
+        );
+    }
 
     return isLoadingPage ? (
         <LoadingPage />
@@ -149,7 +158,7 @@ const Home: React.FC = () => {
             <StartButton variant="contained" color="primary" onClick={startConversation} isMobile={isMobile}>
                 Start Conversation
             </StartButton>
-            {activeUser?.isAdmin && (
+            {(activeUser?.role === 'admin' || activeUser?.role === 'user') && (
                 <ButtonsBox>
                     <AsyncButton
                         isLoading={isLoadingUpdate}

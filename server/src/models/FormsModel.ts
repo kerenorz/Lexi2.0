@@ -4,6 +4,7 @@ import { IForm } from '../types';
 
 export const formsScheme = new Schema<IForm>(
     {
+        ownerId: { type: String, index: true },
         name: { type: String, required: true },
         title: { type: String },
         instructions: { type: String },

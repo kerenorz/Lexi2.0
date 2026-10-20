@@ -1,6 +1,6 @@
 import { AgentType } from '@models/AppModels';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import { Box, IconButton, ListItem, ListItemText } from '@mui/material';
+import { Box, Chip, IconButton, ListItem, ListItemText } from '@mui/material';
 import Typography from '@mui/material/Typography';
 
 interface AgentHeaderProps {
@@ -27,7 +27,14 @@ export const AgentHeader: React.FC<AgentHeaderProps> = ({ agent, setAnchorEl, se
                             alignItems: 'center',
                         }}
                     >
-                        <Typography variant="h5">{agent.title} </Typography>
+                        <Box display="flex" alignItems="center" gap={1}>
+                            <Typography variant="h5">{agent.title}</Typography>
+                            <Chip
+                                size="small"
+                                variant="outlined"
+                                label={`used in ${agent.referenceCount ?? 0} experiments`}
+                            />
+                        </Box>
                         <IconButton
                             aria-label="more"
                             aria-controls="long-menu"

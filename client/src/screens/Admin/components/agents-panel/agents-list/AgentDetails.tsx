@@ -1,5 +1,18 @@
 import { Divider, Grid, List, ListItem, ListItemText, Typography } from '@mui/material';
 
+// Lists only the prompts a phase sets; blank fields inherit from the previous phase.
+const phaseSummary = (phase) => {
+    const changed = [
+        ['System Starter Prompt', phase?.systemStarterPrompt],
+        ['Before User Sentence Prompt', phase?.beforeUserSentencePrompt],
+        ['After User Sentence Prompt', phase?.afterUserSentencePrompt],
+    ].filter(([, value]) => typeof value === 'string' && value.trim());
+
+    return changed.length
+        ? changed.map(([label, value]) => `${label}: ${value}`).join('\n')
+        : "No prompt changes — keeps the previous phase's text.";
+};
+
 export const AgentDetails = ({ agent }) => (
     <Grid container spacing={2} style={{ padding: '20px', paddingTop: '4px' }}>
         <Grid item xs={12} md={6} style={{ borderRight: '2px solid #eee' }}>
@@ -8,6 +21,11 @@ export const AgentDetails = ({ agent }) => (
             </Typography>
             <Divider style={{ marginBottom: '10px' }} />
             <List>
+                {agent.displayName && (
+                    <ListItem>
+                        <ListItemText primary="Display Name" secondary={agent.displayName} />
+                    </ListItem>
+                )}
                 <ListItem>
                     <ListItemText primary="First Chat Sentence" secondary={agent.firstChatSentence} />
                 </ListItem>
@@ -35,6 +53,25 @@ export const AgentDetails = ({ agent }) => (
                         />
                     </ListItem>
                 )}
+                {/* Phase timing lives on the experiment. Phase 1 is the base prompts, so numbering starts at 2. */}
+                {Array.isArray(agent.phases) && agent.phases.length > 0 && (
+                    <ListItem>
+                        <ListItemText
+                            primary="Conversation Phases"
+                            secondary="Phase 1 is the prompts above; when every later phase starts is set on the experiment."
+                        />
+                    </ListItem>
+                )}
+                {Array.isArray(agent.phases) &&
+                    agent.phases.map((phase, index) => (
+                        <ListItem key={index} style={{ paddingLeft: '32px' }}>
+                            <ListItemText
+                                primary={`Phase ${index + 2}${phase?.label ? ` — ${phase.label}` : ''}`}
+                                secondary={phaseSummary(phase)}
+                                secondaryTypographyProps={{ style: { whiteSpace: 'pre-line' } }}
+                            />
+                        </ListItem>
+                    ))}
                 {agent.inverseTimeDelay && (
                     <ListItem>
                         <ListItemText
@@ -81,20 +118,8 @@ export const AgentDetails = ({ agent }) => (
                 </ListItem>
                 <ListItem>
                     <ListItemText
-                        primary="Camera Capture"
-                        secondary={agent.cameraCaptureRate !== null ? agent.cameraCaptureRate : 'Not Active'}
-                    />
-                </ListItem>
-                <ListItem>
-                    <ListItemText
                         primary="Audio Input"
                         secondary={agent.audioInput !== null ? agent.audioInput : 'Not Active'}
-                    />
-                </ListItem>
-                <ListItem>
-                    <ListItemText
-                        primary="Valence-Arousal Integration"
-                        secondary={agent.vaIntegration !== null ? agent.vaIntegration : 'Not Active'}
                     />
                 </ListItem>
                 <ListItem>

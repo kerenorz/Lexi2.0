@@ -40,13 +40,14 @@ const FinishConversationDialog = ({ open, setIsOpen, questionnaireLink, form }) 
 
     const handleDone = async () => {
         try {
-            await finishConversation(conversationId, experimentId, activeUser.isAdmin);
+            await finishConversation(conversationId, experimentId);
         } catch (error) {
             console.error('Failed to finish conversation');
         }
         console.log('Finish Conversation');
     };
 
+    // Called only after the answers are saved; a failed save stays on page 2 and finishes nothing.
     const handleDoneSurvey = async () => {
         if (questionnaireLink) {
             setPage(3);
@@ -84,7 +85,7 @@ const FinishConversationDialog = ({ open, setIsOpen, questionnaireLink, form }) 
                             {questionnaireLink}
                         </a> */}
                     </DialogContent>
-                    {activeUser.isAdmin && (
+                    {(activeUser.role === 'admin' || activeUser.role === 'user') && (
                         <DialogActions>
                             <Button
                                 onClick={() => {

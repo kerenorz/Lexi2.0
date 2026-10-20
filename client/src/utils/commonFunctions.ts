@@ -17,3 +17,13 @@ export const isCamelCase = (str) => {
     const regex = /^[a-z][a-zA-Z0-9]*$/;
     return regex.test(str);
 };
+
+/**
+ * Gets the full experiment URL using the current domain origin.
+ * Works in both development (http://localhost:3000) and production (https://bgulexi.com).
+ * @param experimentId - The experiment ID
+ * @returns Full experiment URL (e.g., "https://bgulexi.com/e/123abc")
+ */
+export const getExperimentUrl = (experimentId: string): string => {
+    return `${window.location.origin}/e/${experimentId}`;
+};

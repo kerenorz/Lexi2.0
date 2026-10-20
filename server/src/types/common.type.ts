@@ -6,4 +6,5 @@ export enum AgentConfig {
 export const AgentsMode = {
     SINGLE: 'Single',
     AB: 'A/B',
+    GROUP: 'Group',
 } as const;

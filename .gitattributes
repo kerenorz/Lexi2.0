@@ -1,0 +1,12 @@
+# .platform/ and .ebextensions/ are read by Elastic Beanstalk on its Linux instances, and the
+# deploy zip copies them from the WORKING TREE. With core.autocrlf=true (the Git for Windows
+# default, set on this machine), every checkout or merge would write them out as CRLF. nginx
+# tolerates a CR in a .conf and YAML reads CRLF as a line break, but a .platform/hooks script
+# with a CRLF shebang does not run, and neither would a script a .config writes to the instance
+# (files:, commands:), so both folders stay LF.
+.platform/** text eol=lf
+.ebextensions/** text eol=lf
+
+# The Procfile ships from the working tree too, and EB reads its one line literally: a CRLF copy
+# would make the start command "node build/server.js\r". Checked by tests/gates/build.test.ts.
+Procfile text eol=lf

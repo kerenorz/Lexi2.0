@@ -1,10 +1,12 @@
 import { AdminSections } from '@DAL/constants';
 import { setActiveUser } from '@DAL/redux/reducers/activeUserReducer';
 import { logout } from '@DAL/server-requests/users';
+import useActiveUser from '@hooks/useActiveUser';
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import BookOutlinedIcon from '@mui/icons-material/BookOutlined';
 import ExitToAppOutlinedIcon from '@mui/icons-material/ExitToAppOutlined';
 import InsertChartOutlinedOutlinedIcon from '@mui/icons-material/InsertChartOutlinedOutlined';
+import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import { Divider, List, ListItem, Typography } from '@mui/material';
@@ -12,12 +14,13 @@ import { useDispatch } from 'react-redux';
 import { MainContainer, StyledListItemIcon } from './SideBar.s';
 import { StyledListItem } from './SideBarAdmin.s';
 
-const sectionsConfig = [
+const allSectionsConfig = [
     { id: AdminSections.EXPERIMENTS, label: 'Experiments', Icon: BookOutlinedIcon },
     { id: AdminSections.AGENTS, label: 'Agents', Icon: AutoAwesomeOutlinedIcon },
     { id: AdminSections.FORMS, label: 'Forms', Icon: TextSnippetIcon },
     { id: AdminSections.DATA, label: 'Data', Icon: InsertChartOutlinedOutlinedIcon },
     { id: AdminSections.SETTINGS, label: 'Settings', Icon: SettingsOutlinedIcon },
+    { id: AdminSections.USERS, label: 'Users', Icon: PersonOutlinedIcon, adminOnly: true },
 ];
 
 import { useNavigate } from 'react-router-dom';
@@ -25,6 +28,11 @@ import { useNavigate } from 'react-router-dom';
 export const SidebarAdmin = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const { activeUser } = useActiveUser();
+
+    const sectionsConfig = activeUser?.role === 'admin'
+        ? allSectionsConfig
+        : allSectionsConfig.filter((s) => !s.adminOnly);
 
     const handleLogout = async () => {
         try {

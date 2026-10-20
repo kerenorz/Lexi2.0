@@ -52,34 +52,24 @@ const foldersToCreate = [
     colors.reset
   );
 
-  const openaiApiKey = await ask(
-    `${colors.yellow}Enter your OPENAI_API_KEY: ${colors.reset}`
-  );
-  const mongodbUser = await ask(
-    `${colors.yellow}Enter your MONGODB_USER: ${colors.reset}`
-  );
-  const mongodbPassword = await ask(
-    `${colors.yellow}Enter your MONGODB_PASSWORD: ${colors.reset}`
-  );
+  // The server connects with MONGODB_URL alone, so it must be the full connection string:
+  // user, password and database name included. LLM API keys are not asked for here; each
+  // researcher adds their own in the admin UI, where they are stored encrypted.
   const mongodbUrl = await ask(
-    `${colors.yellow}Enter your MONGODB_URL: ${colors.reset}`
-  );
-  const mongodbDbName = await ask(
-    `${colors.yellow}Enter your MONGODB_DB_NAME: ${colors.reset}`
+    `${colors.yellow}Enter your full MongoDB connection string, with your user, password and database name in it (local example: mongodb://localhost:27017/lexi): ${colors.reset}`
   );
   const frontendUrl = "http://localhost:3000";
 
   const jwtSecretKey = crypto.randomBytes(16).toString("hex");
+  // Encrypts the stored API keys; utils/encryption.ts requires 64 hex characters (32 bytes).
+  const apiKeyEncryptionKey = crypto.randomBytes(32).toString("hex");
 
   const envContent = `
-  OPENAI_API_KEY="${openaiApiKey}"
-  MONGODB_USER="${mongodbUser}"
-  MONGODB_PASSWORD="${mongodbPassword}"
-  MONGODB_URL="${mongodbUrl}"
-  MONGODB_DB_NAME="${mongodbDbName}"
-  FRONTEND_URL="${frontendUrl}"
-  JWT_SECRET_KEY="${jwtSecretKey}"
-  PORT=5000
+MONGODB_URL="${mongodbUrl}"
+FRONTEND_URL="${frontendUrl}"
+JWT_SECRET_KEY="${jwtSecretKey}"
+API_KEY_ENCRYPTION_KEY="${apiKeyEncryptionKey}"
+PORT=5000
   `.trim();
 
   fs.writeFileSync(".env", envContent);
@@ -101,9 +91,6 @@ const foldersToCreate = [
     colors.reset
   );
   execSync("npm i", { stdio: "inherit" });
-
-  console.log(colors.cyan, `${emojis.info} Installing types...`, colors.reset);
-  execSync("npm i --save-dev @types/node", { stdio: "inherit" });
 
   console.log(
     colors.cyan,

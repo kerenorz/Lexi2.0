@@ -1,8 +1,10 @@
 import { setActiveUser } from '@DAL/redux/reducers/activeUserReducer';
+import { extractError } from '@DAL/extractError';
 import { login } from '@DAL/server-requests/users';
 import { Pages } from '@app/App';
 import { Box, Container, Grid, TextField } from '@mui/material';
 import { getFormErrorMessage } from '@utils/commonFunctions';
+import { resetRemovedModelsAlert } from '@utils/removedModelsAlert';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useDispatch } from 'react-redux';
@@ -17,7 +19,7 @@ interface LoginFormProps {
 export const LoginForm: React.FC<LoginFormProps> = ({ isAdminPage, experimentId }) => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
-    const [isUserAdmin, setIsUserAdmin] = useState(false);
+    const [needsPassword, setNeedsPassword] = useState(false);
     const {
         register,
         handleSubmit,
@@ -29,10 +31,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ isAdminPage, experimentId 
         try {
             const { token, user } = await login(data.username, data.password, experimentId);
 
-            if (user.isAdmin && !token) {
-                setIsUserAdmin(true);
+            if ((user.role === 'admin' || user.role === 'user') && !token) {
+                setNeedsPassword(true);
             } else if (user) {
                 dispatch(setActiveUser(user));
+                resetRemovedModelsAlert();
                 navigate(isAdminPage ? Pages.ADMIN : Pages.EXPERIMENT.replace(':experimentId', experimentId));
             }
         } catch (error) {
@@ -41,11 +44,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({ isAdminPage, experimentId 
                 setError('username', {
                     type: 'manual',
                     message: `User name ${
-                        isUserAdmin || isAdminPage ? 'or Password are' : 'is'
+                        needsPassword || isAdminPage ? 'or Password are' : 'is'
                     } Invalid, Try again or Sign Up`,
                 });
             } else {
-                setError('username', { type: 'manual', message: 'Something went wrong, please try again later' });
+                const { message } = extractError(error, 'Something went wrong, please try again later');
+                setError('username', { type: 'manual', message });
             }
         }
     };
@@ -68,7 +72,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ isAdminPage, experimentId 
                         />
                     </Grid>
                     <Grid item xs={12}>
-                        {(isAdminPage || isUserAdmin) && (
+                        {(isAdminPage || needsPassword) && (
                             <TextField
                                 error={Boolean(errors.password)}
                                 helperText={getFormErrorMessage(errors.password)}

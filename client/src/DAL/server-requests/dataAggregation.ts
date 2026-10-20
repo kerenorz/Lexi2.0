@@ -1,6 +1,5 @@
 import { ApiPaths } from '../constants';
 import axiosInstance from './AxiosInstance';
-import { saveAs } from 'file-saver';
 
 export const downloadExperimentJSON = async (experimentId: string, title: string): Promise<void> => {
     try {
@@ -13,20 +12,6 @@ export const downloadExperimentJSON = async (experimentId: string, title: string
         });
 
         downloadFile(file, title, 'json');
-    } catch (error) {
-        throw error;
-    }
-};
-
-export const downloadFolderAsZip = async (folderName: string): Promise<void> => {
-    try {
-        const response = await axiosInstance.get(`/${ApiPaths.FOLDER_DOWNLOAD_PATH}?folderName=${folderName}`, {
-            responseType: 'blob',
-        });
-
-        const file = new Blob([response.data], { type: 'application/zip' });
-
-        saveAs(file, `${folderName}.zip`);
     } catch (error) {
         throw error;
     }
@@ -49,6 +34,21 @@ export const downloadExperimentXLSX = async (experimentId: string, title: string
     } catch (error) {
         throw error;
     }
+};
+
+// The logged-in researcher's own pilot runs. Kept out of the participant export so they
+// are never counted as participants.
+export const downloadPilotRunsXLSX = async (experimentId: string, title: string): Promise<void> => {
+    const response = await axiosInstance.get(
+        `/${ApiPaths.DATA_AGGREGATION_PATH}/pilots/excel?experimentId=${experimentId}`,
+        { responseType: 'blob' },
+    );
+
+    const file = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+
+    downloadFile(file, `${title} Pilot Runs`, 'xlsx');
 };
 
 const downloadFile = (file: Blob, title: string, fileType: string) => {

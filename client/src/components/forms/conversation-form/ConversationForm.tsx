@@ -1,5 +1,6 @@
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { Box, Grid, IconButton, useMediaQuery } from '@mui/material';
+import { Box, Grid, IconButton, Typography, useMediaQuery } from '@mui/material';
+import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { updateConversationMetadata } from '../../../DAL/server-requests/conversations';
@@ -15,6 +16,10 @@ import {
     ConversationFormFieldTitle,
     ConversationFormTitle,
 } from './ConversationForm.s';
+import { submitQuestionnaire } from './questionnaireSubmit';
+
+// Fixed text: server errors can be internal, and the only fix is pressing Continue again.
+const SAVE_FAILED = 'Your answers could not be saved. Please try again.';
 
 interface FinalRegisterFormProps {
     form: any;
@@ -37,13 +42,29 @@ export const ConversationForm: React.FC<FinalRegisterFormProps> = ({ form, isPre
         formState: { errors },
     } = useForm();
 
+    // The ref is the real in-flight guard: state only disables the button on the next render,
+    // so a quick double press would save twice.
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveFailed, setSaveFailed] = useState(false);
+    const savingRef = useRef(false);
+
+    // Save first; `handleDone` unmounts the form only after success, so a failed save keeps the
+    // answers and Continue retries.
     const onSubmit = async (data) => {
-        try {
-            handleDone();
-            await updateConversationMetadata(conversationId, data, isPreConversation);
-        } catch (err) {
-            console.log("Couldn't Save Conversation Metadata");
-        }
+        if (savingRef.current) return;
+        savingRef.current = true;
+        setIsSaving(true);
+        setSaveFailed(false);
+        const outcome = await submitQuestionnaire({
+            save: () => updateConversationMetadata(conversationId, data, isPreConversation),
+            onSaved: handleDone,
+        });
+        // Saved: keep Continue disabled while the form goes away.
+        if (outcome.status === 'saved') return;
+        console.error("Couldn't save the questionnaire answers", outcome.error);
+        savingRef.current = false;
+        setIsSaving(false);
+        setSaveFailed(true);
     };
 
     return (
@@ -84,10 +105,23 @@ export const ConversationForm: React.FC<FinalRegisterFormProps> = ({ form, isPre
                 ))}
 
             <ConversationFormButtonContainer>
-                <FitButton variant="contained" color="primary" onClick={handleSubmit(onSubmit)}>
+                <FitButton variant="contained" color="primary" disabled={isSaving} onClick={handleSubmit(onSubmit)}>
                     Continue
                 </FitButton>
             </ConversationFormButtonContainer>
+            {saveFailed && (
+                // role="alert" for screen readers; dir="auto" for RTL translations.
+                <Typography
+                    role="alert"
+                    dir="auto"
+                    variant="body2"
+                    color="error"
+                    align="center"
+                    style={{ marginTop: '8px' }}
+                >
+                    {SAVE_FAILED}
+                </Typography>
+            )}
         </ConversationFormContainer>
     );
 };

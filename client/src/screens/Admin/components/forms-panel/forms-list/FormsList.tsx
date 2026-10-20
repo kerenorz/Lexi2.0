@@ -2,6 +2,7 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { IconButton, List, ListItem, ListItemText, Menu, MenuItem } from '@mui/material';
 import React, { useState } from 'react';
 import { deleteForm } from '../../../../../DAL/server-requests/forms';
+import { extractError } from '../../../../../DAL/extractError';
 import theme from '../../../../../Theme';
 import { SnackbarStatus, useSnackbar } from '../../../../../contexts/SnackbarProvider';
 
@@ -36,9 +37,10 @@ const FormsList: React.FC<FormsListProps> = ({ forms, setForms, setSelectedFormI
             await deleteForm(id);
             if (selectedFormId === id) setSelectedFormId(forms.length - 1 ? forms[0]._id : null);
             setForms(forms.filter((form) => form._id !== id));
-            openSnackbar('Delete Form Succes !', SnackbarStatus.SUCCESS);
+            openSnackbar('Delete Form Success !', SnackbarStatus.SUCCESS);
         } catch (err) {
-            openSnackbar('Delete Form Failed', SnackbarStatus.ERROR);
+            const { message } = extractError(err, 'Delete Form Failed');
+            openSnackbar(message, SnackbarStatus.ERROR);
         }
     };
 

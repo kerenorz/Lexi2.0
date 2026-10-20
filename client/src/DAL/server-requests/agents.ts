@@ -1,6 +1,19 @@
-import { AgentLeanType, AgentType } from '@models/AppModels';
+import { AgentLeanType, AgentType, CatalogueModel, RemovedModelAgent } from '@models/AppModels';
 import { ApiPaths } from '../constants';
 import axiosInstance from './AxiosInstance';
+
+// Server-owned model list. Returns `{ models }`, not a bare array like other /agents routes.
+// Array order is render order.
+export const getModelCatalogue = async (): Promise<CatalogueModel[]> => {
+    const response = await axiosInstance.get(`/${ApiPaths.AGENTS_PATH}/models`);
+    return response.data?.models ?? [];
+};
+
+// Caller's in-use agents on removed models, for the post-login alert.
+export const getRemovedModelAgents = async (): Promise<RemovedModelAgent[]> => {
+    const response = await axiosInstance.get(`/${ApiPaths.AGENTS_PATH}/removed-models`);
+    return response.data?.items ?? [];
+};
 
 export const saveAgent = async (agent: AgentType, isActiveAgent = false): Promise<AgentType> => {
     try {
@@ -38,9 +51,10 @@ export const getAgentLean = async (agentId: string): Promise<AgentLeanType> => {
     }
 };
 
-export const deleteAgent = async (agentId: string): Promise<void> => {
+// Without `force` the server returns 409 with the experiments that use this agent.
+export const deleteAgent = async (agentId: string, force = false): Promise<void> => {
     try {
-        await axiosInstance.delete(`/${ApiPaths.AGENTS_PATH}/${agentId}`);
+        await axiosInstance.delete(`/${ApiPaths.AGENTS_PATH}/${agentId}${force ? '?force=true' : ''}`);
         return;
     } catch (error) {
         throw error;
@@ -50,13 +64,13 @@ export const deleteAgent = async (agentId: string): Promise<void> => {
 export const downloadSample = async () => {
     try {
         const response = await axiosInstance.get(`/${ApiPaths.AGENTS_PATH}/download-sample`, {
-            responseType: 'blob', // Important for downloading files
+            responseType: 'blob',
         });
 
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', 'sample_rule_sheet.xlsx'); // or any file name you want
+        link.setAttribute('download', 'sample_rule_sheet.xlsx');
         document.body.appendChild(link);
         link.click();
         link.remove();

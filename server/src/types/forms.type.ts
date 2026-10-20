@@ -53,6 +53,7 @@ type QuestionType =
 
 export interface IForm {
     _id?: mongoose.Types.ObjectId;
+    ownerId?: string;
     name: string;
     title: string;
     instructions: string;

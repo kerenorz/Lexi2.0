@@ -1,8 +1,11 @@
+import FieldInfo from '@components/common/FieldInfo';
 import { AgentType } from '@models/AppModels';
-import { Box, FormControl, MenuItem, Select, Typography } from '@mui/material';
+import { Box, FormControl, Typography } from '@mui/material';
 import { useEffect } from 'react';
-import { Controller, FieldErrors, FieldValues, UseFormSetValue } from 'react-hook-form';
+import { Controller, FieldErrors, FieldValues, UseFormGetValues, UseFormSetValue } from 'react-hook-form';
 import { getFormErrorMessage } from '../../../../../utils/commonFunctions';
+import { AgentPicker } from '../../shared/AgentPicker';
+import { distributionFromTypedA, distributionFromTypedB, initialAbDistribution } from './abDistribution';
 
 interface AbAgentsFormData {
     abAgents: {
@@ -17,15 +20,26 @@ interface AbAgentsProps {
     agents: AgentType[];
     control: any;
     setValue: UseFormSetValue<FieldValues>;
+    getValues: UseFormGetValues<FieldValues>;
     errors: FieldErrors<AbAgentsFormData>;
     isRow?: boolean;
 }
 
-export const AbAgents: React.FC<AbAgentsProps> = ({ agents, control, setValue, isRow = true, errors }) => {
+export const AbAgents: React.FC<AbAgentsProps> = ({
+    agents,
+    control,
+    setValue,
+    getValues,
+    isRow = true,
+    errors,
+}) => {
+    // Keep the saved split (normalized); default to 50/50 only when there is none.
+    // Set the leaf paths: a setValue on parent `abAgents` doesn't reliably reach the Controllers.
     useEffect(() => {
-        setValue('abAgents.distA', 50);
-        setValue('abAgents.distB', 50);
-    }, [setValue]);
+        const { distA, distB } = initialAbDistribution(getValues('abAgents'));
+        setValue('abAgents.distA', distA);
+        setValue('abAgents.distB', distB);
+    }, [getValues, setValue]);
 
     return (
         <Box
@@ -41,20 +55,24 @@ export const AbAgents: React.FC<AbAgentsProps> = ({ agents, control, setValue, i
                 size="small"
                 sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 1 }}
             >
-                <Typography>Agent A:</Typography>
+                <Typography>
+                    Agent A:
+                    <FieldInfo text="Pick two agents and a percentage split; each participant is randomly assigned one. The two percentages must total 100." />
+                </Typography>
                 <Controller
                     name="abAgents.agentA"
                     control={control}
                     defaultValue={agents.length ? agents[0] : ''}
                     rules={{ required: 'Agent A is required.' }}
                     render={({ field }) => (
-                        <Select {...field} size="small" style={{ minWidth: '100px' }}>
-                            {agents.map((agent) => (
-                                <MenuItem key={agent.title} value={agent._id}>
-                                    {agent.title}
-                                </MenuItem>
-                            ))}
-                        </Select>
+                        <AgentPicker
+                            agents={agents}
+                            value={field.value}
+                            onChange={field.onChange}
+                            minWidth={280}
+                            placeholder="Type an agent name…"
+                            error={!!errors.abAgents?.agentA}
+                        />
                     )}
                 />
                 {errors.abAgents?.agentA && (
@@ -71,8 +89,9 @@ export const AbAgents: React.FC<AbAgentsProps> = ({ agents, control, setValue, i
                             style={{ width: '40px' }}
                             defaultValue={50}
                             onChange={(e) => {
-                                field.onChange(Number(e.target.value));
-                                setValue('abAgents.distB', 100 - Number(e.target.value));
+                                const { distA, distB } = distributionFromTypedA(e.target.value);
+                                field.onChange(distA);
+                                setValue('abAgents.distB', distB);
                             }}
                         />
                     )}
@@ -90,13 +109,14 @@ export const AbAgents: React.FC<AbAgentsProps> = ({ agents, control, setValue, i
                     defaultValue={agents.length ? agents[0] : ''}
                     rules={{ required: 'Agent B is required.' }}
                     render={({ field }) => (
-                        <Select {...field} size="small" style={{ minWidth: '100px' }}>
-                            {agents.map((agent) => (
-                                <MenuItem key={agent.title} value={agent._id}>
-                                    {agent.title}
-                                </MenuItem>
-                            ))}
-                        </Select>
+                        <AgentPicker
+                            agents={agents}
+                            value={field.value}
+                            onChange={field.onChange}
+                            minWidth={280}
+                            placeholder="Type an agent name…"
+                            error={!!errors.abAgents?.agentB}
+                        />
                     )}
                 />
                 {errors.abAgents?.agentB && (
@@ -112,8 +132,9 @@ export const AbAgents: React.FC<AbAgentsProps> = ({ agents, control, setValue, i
                             type="number"
                             style={{ width: '40px' }}
                             onChange={(e) => {
-                                field.onChange(Number(e.target.value));
-                                setValue('abAgents.distA', 100 - Number(e.target.value));
+                                const { distA, distB } = distributionFromTypedB(e.target.value);
+                                field.onChange(distB);
+                                setValue('abAgents.distA', distA);
                             }}
                             defaultValue={50}
                         />

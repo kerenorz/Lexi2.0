@@ -1,6 +1,8 @@
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import IntegrationInstructionsOutlinedIcon from '@mui/icons-material/IntegrationInstructionsOutlined';
+import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
 import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
 import SimCardDownloadOutlinedIcon from '@mui/icons-material/SimCardDownloadOutlined';
 import { ListItemIcon, ListItemText, Menu, MenuItem } from '@mui/material';
@@ -9,10 +11,13 @@ export const MoreOptionsMenu = ({
     anchorEl,
     onMenuClose,
     handleMenuAction,
+    showEmbedKit = false,
 }: {
     anchorEl: null | HTMLElement;
     onMenuClose: () => void;
     handleMenuAction;
+    // Only survey-embedded studies have an embed kit.
+    showEmbedKit?: boolean;
 }) => (
     <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={onMenuClose}>
         <MenuItem
@@ -59,17 +64,33 @@ export const MoreOptionsMenu = ({
             </ListItemIcon>
             <ListItemText>Download Excel</ListItemText>
         </MenuItem>
+        {/* Separate from "Download Excel": the participant export excludes the researcher's own runs. */}
         <MenuItem
             onClick={() => {
                 onMenuClose();
-                handleMenuAction('downloadAU');
+                handleMenuAction('downloadPilots');
             }}
         >
             <ListItemIcon>
-                <DownloadIcon fontSize="small" />
+                <ScienceOutlinedIcon fontSize="small" />
             </ListItemIcon>
-            <ListItemText>Download Action Units</ListItemText>
+            <ListItemText>Download My Pilot Runs</ListItemText>
         </MenuItem>
+        {/* No "Download Action Units" entry: its route allowed path traversal and was removed. */}
+        {/* With the exports: it is also a download. */}
+        {showEmbedKit && (
+            <MenuItem
+                onClick={() => {
+                    onMenuClose();
+                    handleMenuAction('downloadEmbedKit');
+                }}
+            >
+                <ListItemIcon>
+                    <IntegrationInstructionsOutlinedIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Qualtrics Embed Kit</ListItemText>
+            </MenuItem>
+        )}
         <MenuItem
             onClick={() => {
                 onMenuClose();

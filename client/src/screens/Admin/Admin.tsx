@@ -1,9 +1,11 @@
 import { AdminSections } from '@DAL/constants';
+import { extractError } from '@DAL/extractError';
 import { getAgents } from '@DAL/server-requests/agents';
+import { checkHasApiKeys } from '@DAL/server-requests/apiKeys';
 import { SnackbarStatus, useSnackbar } from '@contexts/SnackbarProvider';
 import useEffectAsync from '@hooks/useEffectAsync';
 import { AgentType } from '@models/AppModels';
-import { Grid } from '@mui/material';
+import { Grid, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@mui/material';
 import theme from '@root/Theme';
 import { useState } from 'react';
 import { getForms } from '../../DAL/server-requests/forms';
@@ -11,6 +13,7 @@ import { MainContainer, SectionContainer, SectionInnerContainer } from './Admin.
 import { AgentsListContainer } from './components/agents-panel/agents-list/AgentsListContainer';
 import { Experiments } from './components/experiments-panel/experiments/Experiments';
 import FormsPanel from './components/forms-panel/FormsPanel';
+import { RemovedModelsDialog } from './components/RemovedModelsDialog';
 import { SidebarAdmin } from './components/sidebar-admin/SideBarAdmin';
 
 interface Form {
@@ -18,22 +21,29 @@ interface Form {
     name: string;
 }
 
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { DataPanel } from './components/data-panel/DataPanel';
 import { SettingsPanel } from './components/settings-panel/SettingsPanel';
+import { UsersPanel } from './components/users-panel/UsersPanel';
 
 const Admin = () => {
     const [agents, setAgents] = useState<AgentType[]>([]);
     const [forms, setForms] = useState<Form[]>([]);
+    const [showKeyPrompt, setShowKeyPrompt] = useState(false);
     const { openSnackbar } = useSnackbar();
+    const navigate = useNavigate();
 
     useEffectAsync(async () => {
         try {
-            const [agentsRes, formsRes] = await Promise.all([getAgents(), getForms()]);
+            const [agentsRes, formsRes, hasKeys] = await Promise.all([getAgents(), getForms(), checkHasApiKeys()]);
             setAgents(agentsRes);
             setForms(formsRes);
+            if (!hasKeys) {
+                setShowKeyPrompt(true);
+            }
         } catch (error) {
-            openSnackbar('Failed to load agents', SnackbarStatus.ERROR);
+            const { message } = extractError(error, 'Failed to load agents');
+            openSnackbar(message, SnackbarStatus.ERROR);
             setAgents([]);
         }
     }, []);
@@ -69,10 +79,32 @@ const Admin = () => {
                             />
                             <Route path={AdminSections.DATA} element={<DataPanel />} />
                             <Route path={AdminSections.SETTINGS} element={<SettingsPanel />} />
+                            <Route path={AdminSections.USERS} element={<UsersPanel />} />
                         </Routes>
                     </SectionInnerContainer>
                 </SectionContainer>
             </Grid>
+
+            <Dialog open={showKeyPrompt} maxWidth="sm" fullWidth>
+                <DialogTitle>API Key Required</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Please add at least one API key to get started. You can add keys for OpenAI (ChatGPT), Anthropic (Claude), Google (Gemini), xAI (Grok) or OpenRouter in the Settings panel.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        variant="contained"
+                        onClick={() => {
+                            setShowKeyPrompt(false);
+                            navigate(AdminSections.SETTINGS);
+                        }}
+                    >
+                        Go to Settings
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            <RemovedModelsDialog />
         </MainContainer>
     );
 };
