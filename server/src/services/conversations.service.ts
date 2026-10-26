@@ -1562,7 +1562,8 @@ class ConversationsService {
             ...segmentFields,
         });
 
-         const firstChatContent = isPrivileged ? agent.firstChatSentence : user.agent.firstChatSentence;
+        // An agent may have no opening message; then the participant speaks first.
+        const firstChatContent = isPrivileged ? agent.firstChatSentence : user.agent.firstChatSentence;
         await Promise.all([
             ...(firstChatContent
                 ? [this.createMessageDoc(
