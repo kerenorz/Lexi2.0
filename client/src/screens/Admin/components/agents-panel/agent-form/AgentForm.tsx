@@ -348,7 +348,6 @@ const AgentForm: React.FC<AgentFormProps> = ({
         let message = '';
         if (!agent.title) message = 'Title is required.';
         else if (!agent.model) message = 'Agent selection is required.';
-        else if (!agent.firstChatSentence) message = 'First Chat Sentence is required.';
         else if (!agent.systemStarterPrompt) message = 'System Starter Prompt is required.';
         else if (agent.pacing != null) {
             // Report a typo instead of silently falling back to the default. `enabled` holds booleans.
@@ -588,25 +587,41 @@ const AgentForm: React.FC<AgentFormProps> = ({
                 />
                 <FieldInfo text="Which LLM powers this agent; uses the owner's stored key for that provider. An account restricted to certain models can only be given those." />
             </Box>
-            <TextField
-                fullWidth
-                required
-                multiline
-                maxRows={4}
-                rows={4}
-                label="First Chat Sentence"
-                name="firstChatSentence"
-                value={agent.firstChatSentence}
-                onChange={handleChange}
-                size="small"
-                margin="normal"
-                InputProps={{
-                    endAdornment: (
-                        <InputAdornment position="end" sx={{ alignSelf: 'flex-start', mt: 1 }}>
-                            <FieldInfo text="The opening line the agent sends automatically when the conversation starts." />
-                        </InputAdornment>
-                    ),
-                }}
+<FormControlLabel
+                    sx={{ mt: 1 }}
+                    control={
+                        <Checkbox
+                            checked={agent.firstChatSentence !== ''}
+                            onChange={(e) => {
+                                if (!e.target.checked) {
+                                    handleChange({ target: { name: 'firstChatSentence', value: '' } } as React.ChangeEvent<HTMLInputElement>);
+                                }
+                            }}
+                        />
+                    }
+                    label="Send automatic opening message"
+                />
+                {agent.firstChatSentence !== '' && (
+                    <TextField
+                        fullWidth
+                        multiline
+                        maxRows={4}
+                        rows={4}
+                        label="First Chat Sentence"
+                        name="firstChatSentence"
+                        value={agent.firstChatSentence}
+                        onChange={handleChange}
+                        size="small"
+                        margin="normal"
+                        InputProps={{
+                            endAdornment: (
+                                <InputAdornment position="end" sx={{ alignSelf: 'flex-start', mt: 1 }}>
+                                    <FieldInfo text="The opening line the agent sends automatically when the conversation starts." />
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
+                )}
             />
             <TextField
                 fullWidth
