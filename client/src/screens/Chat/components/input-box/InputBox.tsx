@@ -1,8 +1,9 @@
 import { SnackbarStatus, useSnackbar } from '@contexts/SnackbarProvider';
 import { MessageType } from '@models/AppModels';
 import SendIcon from '@mui/icons-material/Send';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
 import { Box, Button, IconButton } from '@mui/material';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { sendMessage, sendStreamMessage } from '../../../../DAL/server-requests/conversations';
 import { StyledInputBase, StyledInputBox } from './InputBox.s';
 
@@ -28,32 +29,35 @@ const InputBox: React.FC<InputBoxProps> = ({
     const { openSnackbar } = useSnackbar();
     const [message, setMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState(null);
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => setSelectedImage(reader.result as string);
+        reader.readAsDataURL(file);
+    };
 
     const handleSendMessage = async () => {
-        if (!message && !errorMessage && !message.trim().length) {
+        if (!message && !errorMessage && !message.trim().length && !selectedImage) {
             openSnackbar('Message cannot be empty', SnackbarStatus.WARNING);
             return;
         }
-        const messageContent: string = message || errorMessage;
-        const conversation: MessageType[] = [...messages, { content: messageContent, role: 'user' }];
+        const messageContent: string = message || errorMessage || '';
+        const imageContent = selectedImage;
+        const conversation: MessageType[] = [...messages, { content: messageContent, role: 'user', image: imageContent }];
         setMessages(conversation);
         setMessage('');
+        setSelectedImage(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
         setIsMessageLoading(true);
         try {
-            if (isStreamMessage && false) {
-                sendStreamMessage(
-                    { content: messageContent, role: 'user' },
-                    conversationId,
-                    onStreamMessage,
-                    onCloseStream,
-                    (error) => onMessageError(conversation, messageContent, error),
-                );
-            } else {
-                const response = await sendMessage({ content: messageContent, role: 'user' }, conversationId);
-                setMessages((prevMessages) => [...prevMessages, response]);
-                setIsMessageLoading(false);
-                setErrorMessage(null);
-            }
+            const response = await sendMessage({ content: messageContent, role: 'user', image: imageContent }, conversationId);
+            setMessages((prevMessages) => [...prevMessages, response]);
+            setIsMessageLoading(false);
+            setErrorMessage(null);
         } catch (err) {
             onMessageError(conversation, messageContent, err);
         }
@@ -77,29 +81,6 @@ const InputBox: React.FC<InputBoxProps> = ({
         setErrorMessage(messageContent);
     };
 
-    const onCloseStream = (message: MessageType) => {
-        setMessages((prevMessages) => [
-            ...prevMessages.slice(0, -1),
-            { ...prevMessages[prevMessages.length - 1], _id: message._id, userAnnotation: message.userAnnotation },
-        ]);
-    };
-
-    const onStreamMessage = (assistantMessagePart: string) => {
-        setIsMessageLoading(false);
-        setMessages((prevMessages) => {
-            const lastMessage = prevMessages[prevMessages.length - 1];
-            if (lastMessage && lastMessage.role === 'assistant') {
-                return [
-                    ...prevMessages.slice(0, -1),
-                    { ...lastMessage, content: lastMessage.content + assistantMessagePart },
-                ];
-            }
-
-            return [...prevMessages, { content: assistantMessagePart, role: 'assistant' }];
-        });
-        setErrorMessage(null);
-    };
-
     const handleKeyDown = (event) => {
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
@@ -117,6 +98,16 @@ const InputBox: React.FC<InputBoxProps> = ({
                 alignItems: 'center',
             }}
         >
+            {selectedImage && (
+                <Box style={{ marginBottom: '8px', position: 'relative', display: 'inline-block' }}>
+                    <img src={selectedImage} alt="preview" style={{ maxHeight: '100px', borderRadius: '8px' }} />
+                    <IconButton
+                        size="small"
+                        onClick={() => { setSelectedImage(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                        style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(0,0,0,0.5)', color: 'white' }}
+                    >✕</IconButton>
+                </Box>
+            )}
             {errorMessage ? (
                 <Button
                     variant="contained"
@@ -130,6 +121,16 @@ const InputBox: React.FC<InputBoxProps> = ({
                 </Button>
             ) : (
                 <StyledInputBox>
+                    <input
+                        type="file"
+                        accept="image/*"
+                        ref={fileInputRef}
+                        style={{ display: 'none' }}
+                        onChange={handleImageSelect}
+                    />
+                    <IconButton onClick={() => fileInputRef.current?.click()}>
+                        <AttachFileIcon />
+                    </IconButton>
                     <StyledInputBase
                         fullWidth
                         placeholder="Type a message…"
