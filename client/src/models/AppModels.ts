@@ -5,6 +5,7 @@ export interface MessageType {
     role: 'system' | 'user' | 'assistant';
     content: string | Blob;
     userAnnotation?: UserAnnotation;
+        image?: string;
 }
 
 export interface AudioType {
