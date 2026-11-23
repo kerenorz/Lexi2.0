@@ -13,6 +13,7 @@ import { ExperimentsModel } from '../models/ExperimentsModel';
 import { authCookieOptions } from '../utils/cookieOptions';
 import { withConversationLock } from '../utils/conversationLock';
 import { clientMessageIdOf } from '../utils/clientMessageId';
+import { messageImageOf } from '../utils/messageImage';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -76,13 +77,20 @@ async function assertOwnsConversation(conversationId: string, userId: string, ro
 
 // Builds the participant's turn server-side. Never forward the client's object: a forged
 // `role: 'assistant'|'system'` would be stored and replayed to the model.
-// Only `content` and a well-formed `clientMessageId` (for re-send dedup) cross over.
+// Only `content`, a well-formed `clientMessageId` (for re-send dedup) and a valid `image` cross over.
 function toParticipantMessage<C extends string | Buffer>(sent: {
     content: C;
     clientMessageId?: unknown;
-}): { role: 'user'; content: C; clientMessageId?: string } {
+    image?: unknown;
+}): { role: 'user'; content: C; clientMessageId?: string; image?: string } {
     const clientMessageId = clientMessageIdOf(sent.clientMessageId);
-    return { role: 'user', content: sent.content, ...(clientMessageId !== undefined && { clientMessageId }) };
+    const image = messageImageOf(sent.image);
+    return {
+        role: 'user',
+        content: sent.content,
+        ...(clientMessageId !== undefined && { clientMessageId }),
+        ...(image !== undefined && { image }),
+    };
 }
 
 class ConversationsController {

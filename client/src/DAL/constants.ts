@@ -152,6 +152,7 @@ export const defaultExperiment = {
         userAnnotation: false,
         streamMessage: false,
         streamWordsPerMinute: DEFAULT_STREAM_WPM,
+        imageUpload: false,
     },
 } as const;
 

@@ -28,6 +28,9 @@ export type ErrorReason =
     | 'EXPERIMENT_MISMATCH'
     | 'INVALID_MESSAGE_FORMAT'
     | 'MESSAGE_TOO_LONG'
+    // Attached picture: unreadable, or the experiment has Image Upload off.
+    | 'INVALID_IMAGE'
+    | 'IMAGES_DISABLED'
     | 'CONTEXT_LENGTH_EXCEEDED'
     | 'PROVIDER_RATE_LIMITED'
     | 'PROVIDER_OVERLOADED'

@@ -5,7 +5,15 @@ import { IConversation } from '../types';
 export const conversationSchema = new Schema<IConversation>(
     {
         conversationId: { type: String, required: true },
-        content: { type: String, required: true },
+        // A message may be a picture alone, so text is required only when no image is attached.
+        // (Mongoose treats '' as missing for a required String.)
+        content: {
+            type: String,
+            required: function (this: { image?: string }) {
+                return !this.image;
+            },
+            default: '',
+        },
         role: { type: String, required: true },
         speakerId: { type: String, required: false },
         speakerName: { type: String, required: false },
@@ -38,6 +46,8 @@ export const conversationSchema = new Schema<IConversation>(
         // Client-sent id on user turns only (utils/clientMessageId); used to dedupe re-sends
         // and to re-sync.
         clientMessageId: { type: String, required: false },
+        // Picture attached by the participant, as a data URL. User turns only.
+        image: { type: String, required: false },
     },
     { versionKey: false },
 );

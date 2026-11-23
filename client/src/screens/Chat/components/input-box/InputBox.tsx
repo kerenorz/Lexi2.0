@@ -2,6 +2,8 @@ import { SnackbarStatus, useSnackbar } from '@contexts/SnackbarProvider';
 import { MessageType } from '@models/AppModels';
 import { speakerMessageColors } from '@root/Theme';
 import SendIcon from '@mui/icons-material/Send';
+import AddPhotoAlternateOutlinedIcon from '@mui/icons-material/AddPhotoAlternateOutlined';
+import CloseIcon from '@mui/icons-material/Close';
 import { Box, Button, IconButton } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -34,6 +36,7 @@ import {
     withdrawUserBubbles,
 } from './groupSendQueue';
 import { StyledInputBase, StyledInputBox } from './InputBox.s';
+import { prepareImageAttachment } from './imageAttachment';
 
 // Idle wait before an autonomous (agent-only) round fires while the user is silent.
 const AUTONOMOUS_IDLE_MS = 6000;
@@ -60,6 +63,8 @@ interface InputBoxProps {
     // Reveal rate for streamed replies, in words per minute. Undefined => module default.
     streamWordsPerMinute?: number;
     isGroup?: boolean;
+    // Shows the attach-picture button (experiment feature Image Upload; never in group mode).
+    allowImages?: boolean;
     speakerColors?: Record<string, string>;
     // Colors of the agents currently typing (0-2); ChatPage renders one indicator per color.
     setTypingColors?: (colors: string[]) => void;
@@ -80,6 +85,7 @@ const InputBox: React.FC<InputBoxProps> = ({
     isStreamMessage,
     streamWordsPerMinute,
     isGroup = false,
+    allowImages = false,
     speakerColors,
     setTypingColors,
     autonomousRounds = 0,
@@ -89,6 +95,12 @@ const InputBox: React.FC<InputBoxProps> = ({
     const { openSnackbar } = useSnackbar();
     const [message, setMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState(null);
+    // Picture chosen for the next message, already shrunk (data URL).
+    const [pendingImage, setPendingImage] = useState<string | null>(null);
+    const [isPreparingImage, setIsPreparingImage] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    // Picture of the last message sent, so Resend sends it again with the text.
+    const lastSentImageRef = useRef<string | null>(null);
 
     // Latest messages for async rounds, where the `messages` closure would be stale.
     const messagesRef = useRef(messages);
@@ -304,9 +316,30 @@ const InputBox: React.FC<InputBoxProps> = ({
         if (batch.length) void reportDisplayedAt(conversationId, batch);
     };
 
+    const handleImagePicked = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        // Cleared so picking the same file again still fires onChange.
+        event.target.value = '';
+        if (!file) return;
+        setIsPreparingImage(true);
+        try {
+            setPendingImage(await prepareImageAttachment(file));
+        } catch (err: any) {
+            openSnackbar(err?.message || 'The picture could not be read.', SnackbarStatus.WARNING);
+        } finally {
+            setIsPreparingImage(false);
+        }
+    };
+
     const handleSendMessage = async () => {
-        if (!message && !errorMessage && !message.trim().length) {
+        // A Resend carries the failed message's picture back with it.
+        const imageToSend: string | null = pendingImage ?? (errorMessage !== null ? lastSentImageRef.current : null);
+        if (!message && !errorMessage && !message.trim().length && !imageToSend) {
             openSnackbar('Message cannot be empty', SnackbarStatus.WARNING);
+            return;
+        }
+        if (isPreparingImage) {
+            openSnackbar('The picture is still loading.', SnackbarStatus.WARNING);
             return;
         }
         // 1-1 stream still open: refuse before touching the screen, or the message shows unsent.
@@ -314,16 +347,20 @@ const InputBox: React.FC<InputBoxProps> = ({
             openSnackbar('Please wait for the current reply to finish.', SnackbarStatus.WARNING);
             return;
         }
-        const messageContent: string = message || errorMessage;
+        const messageContent: string = message || errorMessage || '';
         // One id per submit (a Resend gets a new one), so re-sync and refusal find this message.
         const clientMessageId = newClientMessageId();
+        // Only on 1-1 sends; the group queue carries text alone.
+        const image = !isGroup && imageToSend ? imageToSend : undefined;
+        lastSentImageRef.current = image ?? null;
         // The ref, not the prop: the prop can lag behind bubbles revealed since the last render.
         const conversation: MessageType[] = [
             ...messagesRef.current,
-            { content: messageContent, role: 'user', clientMessageId },
+            { content: messageContent, role: 'user', clientMessageId, ...(image && { image }) },
         ];
         setMessages(conversation);
         setMessage('');
+        setPendingImage(null);
 
         // A submit cancels a pending agent-only round and refills the budget.
         if (isGroup) {
@@ -345,12 +382,15 @@ const InputBox: React.FC<InputBoxProps> = ({
                 isStreamInFlightRef.current = true;
                 streamStartedAtRef.current = null;
                 try {
-                    await runStreamedTurn(conversation, messageContent, clientMessageId);
+                    await runStreamedTurn(conversation, messageContent, clientMessageId, image);
                 } finally {
                     isStreamInFlightRef.current = false;
                 }
             } else {
-                const response = await sendMessage({ content: messageContent, role: 'user', clientMessageId }, conversationId);
+                const response = await sendMessage(
+                    { content: messageContent, role: 'user', clientMessageId, ...(image && { image }) },
+                    conversationId,
+                );
                 // Humanized replies carry a pacing envelope; a plain reply's delay already elapsed.
                 const enveloped = response.some(
                     (m) => m.typingDurationMs != null || m.segmentCount != null || m.preTypingDelayMs != null,
@@ -759,7 +799,12 @@ const InputBox: React.FC<InputBoxProps> = ({
 
     // One streamed 1-1 turn. Resolves when fully typed out, not when the network closes
     // (a reply can arrive in 2s and take 45s to type).
-    const runStreamedTurn = async (conversation: MessageType[], messageContent: string, clientMessageId: string) => {
+    const runStreamedTurn = async (
+        conversation: MessageType[],
+        messageContent: string,
+        clientMessageId: string,
+        image?: string,
+    ) => {
         let saved: MessageType | null = null;
         let aborted = false;
         // Outside the updater because React may call updaters twice.
@@ -792,7 +837,7 @@ const InputBox: React.FC<InputBoxProps> = ({
         revealRef.current = reveal;
 
         await sendStreamMessage(
-            { content: messageContent, role: 'user', clientMessageId },
+            { content: messageContent, role: 'user', clientMessageId, ...(image && { image }) },
             conversationId,
             (chunk) => reveal.push(chunk),
             (savedMessage) => {
@@ -894,7 +939,31 @@ const InputBox: React.FC<InputBoxProps> = ({
                 alignItems: 'center',
             }}
         >
-            {errorMessage ? (
+            {pendingImage && errorMessage === null && (
+                <Box style={{ alignSelf: 'flex-start', position: 'relative', marginBottom: '8px' }}>
+                    <img
+                        src={pendingImage}
+                        alt="Attached"
+                        style={{ maxHeight: '96px', maxWidth: '160px', borderRadius: '12px', display: 'block' }}
+                    />
+                    <IconButton
+                        size="small"
+                        aria-label="Remove picture"
+                        onClick={() => setPendingImage(null)}
+                        style={{
+                            position: 'absolute',
+                            top: 4,
+                            right: 4,
+                            background: 'rgba(0,0,0,0.55)',
+                            color: 'white',
+                            padding: 2,
+                        }}
+                    >
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
+                </Box>
+            )}
+            {errorMessage !== null ? (
                 <Button
                     variant="contained"
                     onClick={() => {
@@ -907,6 +976,25 @@ const InputBox: React.FC<InputBoxProps> = ({
                 </Button>
             ) : (
                 <StyledInputBox>
+                    {allowImages && !isGroup && (
+                        <>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                style={{ display: 'none' }}
+                                onChange={handleImagePicked}
+                            />
+                            <IconButton
+                                aria-label="Attach a picture"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={isPreparingImage}
+                                style={{ alignSelf: 'center' }}
+                            >
+                                <AddPhotoAlternateOutlinedIcon />
+                            </IconButton>
+                        </>
+                    )}
                     <StyledInputBase
                         fullWidth
                         placeholder="Type a message…"

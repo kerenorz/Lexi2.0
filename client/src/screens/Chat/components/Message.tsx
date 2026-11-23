@@ -138,19 +138,37 @@ const Message: React.FC<MessageProps> = ({
                             <div ref={waveformRef} style={{ width: "150px" }} />
                         </Box>
                     ) : (
-                        <Typography
-                            variant="body2"
-                            // Per-message direction so Hebrew punctuation lands on the right.
-                            // `auto`, not `rtl`, since English studies use this too.
-                            dir="auto"
-                            sx={{
-                                whiteSpace: "pre-line",
-                                fontSize: size === "sm" ? "1rem" : "1.25rem",
-                                fontWeight: 500,
-                            }}
-                        >
-                            {getFormattedMessage(message.content)}
-                        </Typography>
+                        <>
+                            {message.image && (
+                                <Box
+                                    component="img"
+                                    src={message.image}
+                                    alt="Attached"
+                                    sx={{
+                                        display: 'block',
+                                        maxWidth: '100%',
+                                        maxHeight: 320,
+                                        borderRadius: '16px',
+                                        marginBottom: message.content ? 1 : 0,
+                                    }}
+                                />
+                            )}
+                            {(!message.image || !!message.content) && (
+                                <Typography
+                                    variant="body2"
+                                    // Per-message direction so Hebrew punctuation lands on the right.
+                                    // `auto`, not `rtl`, since English studies use this too.
+                                    dir="auto"
+                                    sx={{
+                                        whiteSpace: "pre-line",
+                                        fontSize: size === "sm" ? "1rem" : "1.25rem",
+                                        fontWeight: 500,
+                                    }}
+                                >
+                                    {getFormattedMessage(message.content)}
+                                </Typography>
+                            )}
+                        </>
                     )}
                 </Box>
                 {!isUser && experimentHasUserAnnotation && message._id && (

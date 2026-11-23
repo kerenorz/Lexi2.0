@@ -37,6 +37,8 @@ export interface IConversation {
     move?: string | null;
     // Client-generated id; user turns only, when well-formed.
     clientMessageId?: string;
+    // Picture the participant attached, as a data URL. User turns only.
+    image?: string;
 }
 
 export interface IExplainable {
@@ -74,6 +76,8 @@ export interface Message {
     phaseLabel?: string | null;
     // See IConversation.clientMessageId. Never sent to a model.
     clientMessageId?: string;
+    // See IConversation.image. Sent to the model as an image part next to the text.
+    image?: string;
 }
 
 export interface Audio {

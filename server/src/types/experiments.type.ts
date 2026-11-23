@@ -111,6 +111,8 @@ export interface ExperimentFeatures {
     streamMessage: boolean;
     // Client reveal rate for streamed text (word = 5 chars). Absent: use DEFAULT_STREAM_WPM.
     streamWordsPerMinute?: number;
+    // Lets participants attach a picture to a message (single-agent conversations only).
+    imageUpload?: boolean;
 }
 
 // An experiment references an agent that was deleted. Shown on the admin list and thrown

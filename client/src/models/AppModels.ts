@@ -26,6 +26,8 @@ export interface MessageType {
     // Client-generated id for user messages, persisted by the server. Used to re-sync and
     // withdraw messages. See clientMessageId.ts.
     clientMessageId?: string;
+    // Picture the participant attached, as a data URL. User messages only.
+    image?: string;
 }
 
 export interface AudioType {
@@ -322,6 +324,8 @@ export interface ExperimentFeatures {
     streamMessage: boolean;
     // Streamed reveal rate (a word = 5 characters). Absent: use DEFAULT_STREAM_WPM.
     streamWordsPerMinute?: number;
+    // Lets participants attach a picture to a message (single-agent conversations only).
+    imageUpload?: boolean;
 }
 
 export interface NewUserInfoType {

@@ -22,6 +22,9 @@ export const ERROR_REASON = {
     CANNOT_CREATE_FOR_OTHER_USER: 'CANNOT_CREATE_FOR_OTHER_USER',
     INVALID_MESSAGE_FORMAT: 'INVALID_MESSAGE_FORMAT',
     MESSAGE_TOO_LONG: 'MESSAGE_TOO_LONG',
+    // Attached picture: unreadable, or the experiment has Image Upload off.
+    INVALID_IMAGE: 'INVALID_IMAGE',
+    IMAGES_DISABLED: 'IMAGES_DISABLED',
     // Re-sent message already stored; group re-sync treats it as persisted. Shares 409 with
     // MESSAGE_NUMBER_CONFLICT, so branch on the reason, not the status.
     DUPLICATE_MESSAGE: 'DUPLICATE_MESSAGE',

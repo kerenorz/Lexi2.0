@@ -363,6 +363,7 @@ class ConversationsService {
         ]);
 
         await this.assertCanSendTurn(conversationId, metadataConversation);
+        await this.assertImageAllowed(turn, metadataConversation);
 
         if (metadataConversation.mode === AgentsMode.GROUP) {
             return this.groupMessage(turn, conversationId, callerUserId, callerRole, metadataConversation, clientMessageId);
@@ -383,6 +384,19 @@ class ConversationsService {
                 clientMessageId,
             ),
         );
+    };
+
+    // A picture is accepted only where the researcher turned Image Upload on, and only in 1-1:
+    // group rounds build their history from text alone.
+    private assertImageAllowed = async (turn: { image?: string }, metadataConversation: any): Promise<void> => {
+        if (!turn.image) return;
+        if (metadataConversation.mode === AgentsMode.GROUP) {
+            throw new AppError('Pictures are not supported in group conversations.', 400, 'IMAGES_DISABLED');
+        }
+        const features = await experimentsService.getExperimentFeatures(String(metadataConversation.experimentId));
+        if (!features?.imageUpload) {
+            throw new AppError('Pictures are not enabled for this conversation.', 403, 'IMAGES_DISABLED');
+        }
     };
 
     // Refuses a re-send of a stored message (client re-sync after a dropped stream). Checked first,
@@ -2164,14 +2178,16 @@ class ConversationsService {
 
     getConversation = async (conversationId: string, isLean = false): Promise<Message[]> => {
         const returnValues = isLean
-            ? { _id: 0, role: 1, content: 1, timeDelay: 1}
+            ? { _id: 0, role: 1, content: 1, timeDelay: 1, image: 1 }
             // Speaker fields exist only on group docs.
             : { _id: 1, role: 1, content: 1, timeDelay: 1, userAnnotation: 1, speakerId: 1, speakerName: 1, messageNumber: 1,
                 // Timing envelope, so a reload keeps the server's pacing.
                 preTypingDelayMs: 1, typingDurationMs: 1, interSegmentPauseMs: 1,
                 segmentGroupId: 1, segmentIndex: 1, segmentCount: 1, revealAtMs: 1, displayedAt: 1,
                 // For the client's re-sync. Not in the lean projection, which is sent to the model.
-                clientMessageId: 1 };
+                clientMessageId: 1,
+                // So a reload still shows the pictures the participant sent.
+                image: 1 };
 
         const conversation = await ConversationsModel.find({ conversationId }, returnValues).sort({ messageNumber: 1 });
 
@@ -2526,6 +2542,7 @@ class ConversationsService {
                 speakerName: message.speakerName,
             }),
             ...(message.clientMessageId != null && { clientMessageId: message.clientMessageId }),
+            ...(message.image ? { image: message.image } : {}),
             ...(extra && {
                 preTypingDelayMs: extra.preTypingDelayMs,
                 typingDurationMs: extra.typingDurationMs,

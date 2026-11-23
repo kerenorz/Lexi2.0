@@ -14,6 +14,7 @@ import { GoogleGenAI } from '@google/genai';
 import { LLMProvider } from '../types';
 import { AppError, isAppError } from '../utils/errors';
 import { getCatalogueModel, OpenRouterParam, OpenRouterRoute } from '../constants/modelCatalogue';
+import { splitDataUrl } from '../utils/messageImage';
 
 export function getProviderFromModel(modelName: string): LLMProvider {
     // OpenRouter ids are "<maker>/<model>"; no direct id has a slash. Checked first so
@@ -90,11 +91,25 @@ export const COMPLETION_CLIENT_OPTIONS = { ...NO_SDK_RETRIES, timeout: PROVIDER_
 export const makeGeminiClient = (apiKey: string, stream: boolean): GoogleGenAI =>
     new GoogleGenAI(stream ? { apiKey } : { apiKey, httpOptions: { timeout: PROVIDER_TIMEOUT_MS } });
 
+export type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } };
+
+// Gemini parts for one turn: its pictures, then its text.
+export const geminiParts = (text: string, images: string[]): GeminiPart[] => {
+    const parts: GeminiPart[] = images.map((url) => {
+        const { mediaType, data } = splitDataUrl(url);
+        return { inlineData: { mimeType: mediaType, data } };
+    });
+    if (text || !parts.length) parts.push({ text });
+    return parts;
+};
+
 // `history` is the turns before `message`, which is always a user turn.
 export interface GeminiRequest {
+    // Pictures attached to `message`.
+    messageImages?: string[];
     model: string;
     systemInstruction?: string;
-    history: { role: 'user' | 'model'; parts: { text: string }[] }[];
+    history: { role: 'user' | 'model'; parts: GeminiPart[] }[];
     message: string;
     generationConfig: Record<string, unknown>;
 }
@@ -107,7 +122,7 @@ export async function geminiCompletion(
     emission: ReturnType<typeof trackStreamEmission>,
 ): Promise<string> {
     const ai = makeGeminiClient(apiKey, stream);
-    const contents = [...req.history, { role: 'user' as const, parts: [{ text: req.message }] }];
+    const contents = [...req.history, { role: 'user' as const, parts: geminiParts(req.message, req.messageImages ?? []) }];
     const config: Record<string, unknown> = { ...req.generationConfig };
     if (req.systemInstruction) config.systemInstruction = req.systemInstruction;
 
@@ -294,19 +309,45 @@ export const openRouterBody = (model: string, sampling: RequestedSampling): Reco
     return body;
 };
 
+// Pictures a message carries: `image` on a stored turn, `images` once merged.
+export const imagesOf = (m: any): string[] => {
+    if (Array.isArray(m?.images)) return m.images;
+    return m?.image ? [m.image] : [];
+};
+
+// OpenAI chat format: plain text stays a string; a turn with pictures becomes text + image parts.
+export const openAIContent = (text: string, images: string[]): string | any[] => {
+    if (!images.length) return text;
+    const parts: any[] = images.map((url) => ({ type: 'image_url', image_url: { url } }));
+    if (text) parts.push({ type: 'text', text });
+    return parts;
+};
+
+// Same message, with its content in OpenAI's multimodal shape when it carries a picture.
+const toOpenAIMessage = (m: any): any => {
+    const images = imagesOf(m);
+    if (!images.length) return m;
+    return { role: m.role, content: openAIContent(m.content || '', images) };
+};
+
 // Only {role, content} is sent; Lexi's own message fields stay local.
-export const openRouterMessages = (model: string, messages: any[]): { role: string; content: string }[] => {
-    const plain = messages.map((m: any) => ({ role: m.role, content: m.content }));
+export const openRouterMessages = (model: string, messages: any[]): { role: string; content: string | any[] }[] => {
+    const plain = messages.map((m: any) => ({ role: m.role, content: m.content, images: imagesOf(m) }));
     // As openAIChatCompletion sends them, trailing empty assistant prime and all.
-    if (openRouterKeepsSystemInPlace(model)) return plain;
+    if (openRouterKeepsSystemInPlace(model)) {
+        return plain.map((m) => ({ role: m.role, content: openAIContent(m.content, m.images) }));
+    }
 
     // As anthropicChatCompletion shapes them.
     const system = plain.filter((m) => m.role === 'system').map((m) => m.content).filter(Boolean).join('\n');
     const merged = mergeConsecutiveMessages(plain.filter((m) => m.role !== 'system'));
     while (merged.length > 0 && merged[0].role === 'assistant') merged.shift();
     const turns = merged
-        .map((m: any) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }))
-        .filter((m: any) => m.content);
+        .filter((m: any) => m.content || imagesOf(m).length)
+        .map((m: any) => ({
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: openAIContent(m.content || '', imagesOf(m)),
+        }));
     return system ? [{ role: 'system', content: system }, ...turns] : turns;
 };
 
@@ -677,8 +718,18 @@ export const responsesParamsFromChat = (chatParams: any): any => {
     const params: any = {
         model: chatParams.model,
         input: (chatParams.messages as any[])
-            .filter((m) => typeof m.content === 'string' && m.content !== '')
-            .map((m) => ({ role: m.role, content: m.content })),
+            .filter((m) => (typeof m.content === 'string' && m.content !== '') || Array.isArray(m.content))
+            .map((m) => ({
+                role: m.role,
+                // Chat image parts become Responses input parts.
+                content: Array.isArray(m.content)
+                    ? m.content.map((part: any) =>
+                          part.type === 'image_url'
+                              ? { type: 'input_image', image_url: part.image_url.url }
+                              : { type: 'input_text', text: part.text },
+                      )
+                    : m.content,
+            })),
     };
     if (chatParams.max_completion_tokens != null) params.max_output_tokens = chatParams.max_completion_tokens;
     params.store = false;
@@ -736,7 +787,7 @@ const openAIParams = (chatRequest: any): any => {
     // Only OpenAI-supported parameters.
     const params: any = {
         model: chatRequest.model,
-        messages: chatRequest.messages,
+        messages: chatRequest.messages.map(toOpenAIMessage),
     };
 
     // Always max_completion_tokens: gpt-5 and o-series reject max_tokens. Reasoning models get the floor.
@@ -780,11 +831,19 @@ async function anthropicChatCompletion(
     }
 
     const mappedMessages = mergedMessages
-        .map((m: any) => ({
-            role: m.role === 'assistant' ? 'assistant' : 'user',
-            content: m.content,
-        }))
-        .filter((m: any) => m.content);
+        .filter((m: any) => m.content || imagesOf(m).length)
+        .map((m: any) => {
+            const images = imagesOf(m);
+            if (!images.length) {
+                return { role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content };
+            }
+            const blocks: any[] = images.map((url) => {
+                const { mediaType, data } = splitDataUrl(url);
+                return { type: 'image', source: { type: 'base64', media_type: mediaType, data } };
+            });
+            if (m.content) blocks.push({ type: 'text', text: m.content });
+            return { role: 'user', content: blocks };
+        });
 
     const params: any = {
         model: chatRequest.model,
@@ -836,7 +895,7 @@ async function googleChatCompletion(
     // Send the last non-empty user message; the array ends with an empty assistant prime.
     let sendMessageIndex = -1;
     for (let i = nonSystemMessages.length - 1; i >= 0; i--) {
-        if (nonSystemMessages[i].role === 'user' && nonSystemMessages[i].content) {
+        if (nonSystemMessages[i].role === 'user' && (nonSystemMessages[i].content || imagesOf(nonSystemMessages[i]).length)) {
             sendMessageIndex = i;
             break;
         }
@@ -850,11 +909,11 @@ async function googleChatCompletion(
 
     // Everything before it, in Gemini format.
     const history = nonSystemMessages.slice(0, sendMessageIndex)
+        .filter((m: any) => m.content || imagesOf(m).length)
         .map((m: any) => ({
             role: m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: m.content || '' }],
-        }))
-        .filter((m: any) => m.parts[0].text);
+            parts: geminiParts(m.content || '', imagesOf(m)),
+        }));
 
     // Gemini requires the first message to be 'user'.
     while (history.length > 0 && history[0].role === 'model') {
@@ -877,6 +936,7 @@ async function googleChatCompletion(
             systemInstruction: systemInstruction || undefined,
             history,
             message: userMessageToSend.content,
+            messageImages: imagesOf(userMessageToSend),
             generationConfig,
         },
         stream,
@@ -887,12 +947,15 @@ async function googleChatCompletion(
 export function mergeConsecutiveMessages(messages: any[]): any[] {
     const merged: any[] = [];
     for (const msg of messages) {
-        if (!msg.content) continue;
+        const images = imagesOf(msg);
+        if (!msg.content && !images.length) continue;
         const last = merged[merged.length - 1];
         if (last && last.role === msg.role) {
-            last.content += '\n' + msg.content;
+            if (msg.content) last.content = last.content ? last.content + '\n' + msg.content : msg.content;
+            if (images.length) last.images = [...imagesOf(last), ...images];
         } else {
-            merged.push({ ...msg });
+            // Plain copy (stored turns may be mongoose documents), pictures under `images`.
+            merged.push({ role: msg.role, content: msg.content || '', ...(images.length && { images }) });
         }
     }
     return merged;

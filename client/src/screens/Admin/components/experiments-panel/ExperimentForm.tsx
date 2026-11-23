@@ -482,6 +482,23 @@ const ExperimentForm = ({
             </Box>
             <Box style={{ width: '100%' }}>
                 <Controller
+                    name="experimentFeatures.imageUpload"
+                    control={control}
+                    render={({ field }) => (
+                        <FormControlLabel
+                            control={<Checkbox {...field} checked={!!field.value} />}
+                            label={
+                                <>
+                                    <span>Image Upload</span>
+                                    <FieldInfo text="Adds a button next to the message box so participants can attach a picture, like in ChatGPT or Claude. The picture is shrunk to 1024px, saved with the message, and sent to the model with the text. Works in Single and A/B conversations only (not Group). The agent's model must accept images." />
+                                </>
+                            }
+                        />
+                    )}
+                />
+            </Box>
+            <Box style={{ width: '100%' }}>
+                <Controller
                     name="experimentFeatures.streamMessage"
                     control={control}
                     render={({ field }) => (

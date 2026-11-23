@@ -343,6 +343,7 @@ const ChatPage: React.FC<ChatPageProps> = ({
                                     isStreamMessage={experimentFeatures?.streamMessage}
                                     streamWordsPerMinute={experimentFeatures?.streamWordsPerMinute}
                                     isGroup={isGroup}
+                                    allowImages={!isGroup && !!experimentFeatures?.imageUpload}
                                     speakerColors={speakerColors}
                                     setTypingColors={setTypingColors}
                                     autonomousRounds={autonomousRounds}
