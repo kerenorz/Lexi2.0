@@ -2468,7 +2468,8 @@ class ConversationsService {
             const final_message = "The valence of the user is "+ val + " and the arousal is "+ ar + "while user replies to you " + message["content"]
             message["content"] = final_message
         }
-        console.log(message)
+        // An attached picture is a data URL of hundreds of thousands of characters: log a marker instead.
+        console.log(message?.image ? { ...message, image: '[image]' } : message)
         const messages = [
             systemPrompt,
             ...conversation,
