@@ -92,6 +92,8 @@ export const makeGeminiClient = (apiKey: string, stream: boolean): GoogleGenAI =
 
 // `history` is the turns before `message`, which is always a user turn.
 export interface GeminiRequest {
+    // Experiment feature Web Search: Google Search grounding (paid Gemini keys only).
+    webSearch?: boolean;
     model: string;
     systemInstruction?: string;
     history: { role: 'user' | 'model'; parts: { text: string }[] }[];
@@ -110,6 +112,7 @@ export async function geminiCompletion(
     const contents = [...req.history, { role: 'user' as const, parts: [{ text: req.message }] }];
     const config: Record<string, unknown> = { ...req.generationConfig };
     if (req.systemInstruction) config.systemInstruction = req.systemInstruction;
+    if (req.webSearch) config.tools = [{ googleSearch: {} }];
 
     return runProvider('google', () => withRetry(async () => {
         if (!stream) {
@@ -723,10 +726,16 @@ export async function openAIResponsesCompletion(
     }, undefined, emission.canRetry));
 }
 
+// OpenRouter's server-side search tool: the model decides when to search, OpenRouter runs it
+// (the maker's own search where it has one, else Exa) and bills it on the same key.
+export const OPENROUTER_WEB_SEARCH_TOOL = { type: 'openrouter:web_search' };
+
 const openRouterParams = (chatRequest: any): any => ({
     model: chatRequest.model,
     messages: openRouterMessages(chatRequest.model, chatRequest.messages),
     ...openRouterBody(chatRequest.model, chatRequest),
+    // Experiment feature Web Search (see turnContext.ts).
+    ...(chatRequest.webSearch && { tools: [OPENROUTER_WEB_SEARCH_TOOL] }),
 });
 
 const openAIParams = (chatRequest: any): any => {
@@ -878,6 +887,7 @@ async function googleChatCompletion(
             history,
             message: userMessageToSend.content,
             generationConfig,
+            webSearch: !!chatRequest.webSearch,
         },
         stream,
         trackStreamEmission(onStreamChunk),

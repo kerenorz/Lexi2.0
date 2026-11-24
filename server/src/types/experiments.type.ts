@@ -111,6 +111,10 @@ export interface ExperimentFeatures {
     streamMessage: boolean;
     // Client reveal rate for streamed text (word = 5 chars). Absent: use DEFAULT_STREAM_WPM.
     streamWordsPerMinute?: number;
+    // Adds the current date and time (Israel) to each 1-1 turn's instructions; never shown in the chat.
+    todaysDate?: boolean;
+    // Lets the model search the web when a question needs it (OpenRouter and Gemini models, 1-1 only).
+    webSearch?: boolean;
 }
 
 // An experiment references an agent that was deleted. Shown on the admin list and thrown

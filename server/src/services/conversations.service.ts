@@ -74,6 +74,7 @@ import {
 } from './threadControl.service';
 import { makeRng, mulberry32 } from '../utils/seededRandom';
 import { AppError } from '../utils/errors';
+import { applyTurnContext } from '../utils/turnContext';
 import { CONVERSATION_LOCK_MAX_HOLD_MS } from '../utils/conversationLock';
 import { CurrentStateModels } from '../models/CurrentStateModels';
 import fetch from "node-fetch";
@@ -472,7 +473,7 @@ class ConversationsService {
         const og_text = { ...message };
         //console.log(og_text)
         const messages: any[] = this.getConversationMessages(agent, conversation, message, val, ar, ccr, vai);
-        const chatRequest = this.getChatRequest(agent, messages);
+        const chatRequest = await this.withTurnContext(this.getChatRequest(agent, messages), metadataConversation);
         const userTurn = await this.createMessageDoc(
             withClientMessageId(message, clientMessageId),
             conversationId,
@@ -1227,7 +1228,7 @@ class ConversationsService {
 
         const og_text = { ...message };
         const messages: any[] = this.getConversationMessages(agent, conversation, message, val, ar, ccr, vai);
-        const chatRequest = this.getChatRequest(agent, messages);
+        const chatRequest = await this.withTurnContext(this.getChatRequest(agent, messages), metadataConversation);
 
         const userTurn = await this.createMessageDoc(
             withClientMessageId(message, clientMessageId),
@@ -2582,6 +2583,12 @@ class ConversationsService {
         });
 
         return res;
+    };
+
+    // Today's date and web search, when the experiment switched them on (Experiment Features).
+    private withTurnContext = async <R extends { messages: any[] }>(chatRequest: R, metadataConversation: any) => {
+        const features = await experimentsService.getExperimentFeatures(String(metadataConversation.experimentId));
+        return applyTurnContext(chatRequest, features);
     };
 
     private getChatRequest = (agent: IAgent, messages: Message[]) => {
