@@ -6,6 +6,8 @@
     "node": ">=22.0.0 <23.0.0"
   },
   "dependencies": {
+    "@capacitor/android": "^7.6.10",
+    "@capacitor/core": "^7.6.10",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.14.1",
@@ -56,6 +58,7 @@
     ]
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.6.10",
     "eslint": "^8.54.0",
     "eslint-config-prettier": "9.0.0",
     "eslint-plugin-prettier": "^5.0.1",

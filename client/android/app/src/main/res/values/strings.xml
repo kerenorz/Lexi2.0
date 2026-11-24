@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Lexi</string>
+    <string name="title_activity_main">Lexi</string>
+    <string name="package_name">com.lexi.app</string>
+    <string name="custom_url_scheme">com.lexi.app</string>
+</resources>
