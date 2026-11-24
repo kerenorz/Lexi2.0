@@ -326,6 +326,10 @@ export interface ExperimentFeatures {
     streamWordsPerMinute?: number;
     // Lets participants attach a picture to a message (single-agent conversations only).
     imageUpload?: boolean;
+    // Adds the current date and time (Israel) to the model's instructions each turn; never shown in the chat.
+    todaysDate?: boolean;
+    // Lets the model search the web when a question needs it (OpenRouter and Gemini models, 1-1 only).
+    webSearch?: boolean;
 }
 
 export interface NewUserInfoType {

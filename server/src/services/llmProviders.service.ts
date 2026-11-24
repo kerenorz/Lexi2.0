@@ -107,6 +107,8 @@ export const geminiParts = (text: string, images: string[]): GeminiPart[] => {
 export interface GeminiRequest {
     // Pictures attached to `message`.
     messageImages?: string[];
+    // Experiment feature Web Search: Google Search grounding (paid Gemini keys only).
+    webSearch?: boolean;
     model: string;
     systemInstruction?: string;
     history: { role: 'user' | 'model'; parts: GeminiPart[] }[];
@@ -125,6 +127,7 @@ export async function geminiCompletion(
     const contents = [...req.history, { role: 'user' as const, parts: geminiParts(req.message, req.messageImages ?? []) }];
     const config: Record<string, unknown> = { ...req.generationConfig };
     if (req.systemInstruction) config.systemInstruction = req.systemInstruction;
+    if (req.webSearch) config.tools = [{ googleSearch: {} }];
 
     return runProvider('google', () => withRetry(async () => {
         if (!stream) {
@@ -774,10 +777,16 @@ export async function openAIResponsesCompletion(
     }, undefined, emission.canRetry));
 }
 
+// OpenRouter's server-side search tool: the model decides when to search, OpenRouter runs it
+// (the maker's own search where it has one, else Exa) and bills it on the same key.
+export const OPENROUTER_WEB_SEARCH_TOOL = { type: 'openrouter:web_search' };
+
 const openRouterParams = (chatRequest: any): any => ({
     model: chatRequest.model,
     messages: openRouterMessages(chatRequest.model, chatRequest.messages),
     ...openRouterBody(chatRequest.model, chatRequest),
+    // Experiment feature Web Search (see turnContext.ts).
+    ...(chatRequest.webSearch && { tools: [OPENROUTER_WEB_SEARCH_TOOL] }),
 });
 
 const openAIParams = (chatRequest: any): any => {
@@ -938,6 +947,7 @@ async function googleChatCompletion(
             message: userMessageToSend.content,
             messageImages: imagesOf(userMessageToSend),
             generationConfig,
+            webSearch: !!chatRequest.webSearch,
         },
         stream,
         trackStreamEmission(onStreamChunk),

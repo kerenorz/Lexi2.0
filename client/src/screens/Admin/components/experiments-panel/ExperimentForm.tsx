@@ -499,6 +499,40 @@ const ExperimentForm = ({
             </Box>
             <Box style={{ width: '100%' }}>
                 <Controller
+                    name="experimentFeatures.todaysDate"
+                    control={control}
+                    render={({ field }) => (
+                        <FormControlLabel
+                            control={<Checkbox {...field} checked={!!field.value} />}
+                            label={
+                                <>
+                                    <span>Today's Date</span>
+                                    <FieldInfo text="Tells the model the current date and time in Israel on every turn, so it can answer questions like 'when does Shabbat start' or 'what day is it'. Added to the instructions only; participants never see it, and the model mentions it only when relevant. Single and A/B conversations." />
+                                </>
+                            }
+                        />
+                    )}
+                />
+            </Box>
+            <Box style={{ width: '100%' }}>
+                <Controller
+                    name="experimentFeatures.webSearch"
+                    control={control}
+                    render={({ field }) => (
+                        <FormControlLabel
+                            control={<Checkbox {...field} checked={!!field.value} />}
+                            label={
+                                <>
+                                    <span>Web Search</span>
+                                    <FieldInfo text="Lets the model search the web when a question needs current information (news, opening hours, schedules). The model decides when to search. Works with OpenRouter models (about 1 cent per search, billed to the same key) and Gemini models on a paid Gemini key; other models ignore it. Single and A/B conversations. Replies that used a search may be longer and cite sources." />
+                                </>
+                            }
+                        />
+                    )}
+                />
+            </Box>
+            <Box style={{ width: '100%' }}>
+                <Controller
                     name="experimentFeatures.streamMessage"
                     control={control}
                     render={({ field }) => (
